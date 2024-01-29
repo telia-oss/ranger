@@ -109,3 +109,4 @@ Installation Process
    If the install.sh file does not exists, 
        Execute ./enable-<component>-plugin.sh
 
+Maven command with Trino 390+ : mvn -P all,-linux -pl jisql,agents-audit,agents-common,agents-cred,intg,agents-installer,credentialbuilder,embeddedwebserver,security-admin,plugin-nifi,plugin-nifi-registry,ugsync-util,ugsync,ugsync/ldapconfigchecktool/ldapconfigcheck,unixauthclient,unixauthservice,ranger-util,tagsync,ranger-plugin-classloader,ranger-examples,ranger-tools,plugin-trino,ranger-trino-plugin-shim,distro -am package -DskipTests=true -DskipJSTests -Dremoteresources.skip -Dtrino.version=433
