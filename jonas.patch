@@ -1,0 +1,53 @@
+diff --git a/plugin-trino/src/main/java/org/apache/ranger/authorization/trino/authorizer/RangerSystemAccessControl.java b/plugin-trino/src/main/java/org/apache/ranger/authorization/trino/authorizer/RangerSystemAccessControl.java
+index e147243ae..f51a4a849 100644
+--- a/plugin-trino/src/main/java/org/apache/ranger/authorization/trino/authorizer/RangerSystemAccessControl.java
++++ b/plugin-trino/src/main/java/org/apache/ranger/authorization/trino/authorizer/RangerSystemAccessControl.java
+@@ -421,7 +421,7 @@ public void checkCanShowCreateTable(SystemSecurityContext context, CatalogSchema
+   @Override
+   public void checkCanCreateTable(SystemSecurityContext context, CatalogSchemaTableName table,
+       Map<String, Object> properties) {
+-    if (!hasPermission(createResource(table.getCatalogName(), table.getSchemaTableName().getSchemaName()), context,
++    if (!hasPermission(createResource(table), context,
+         TrinoAccessType.CREATE)) {
+       LOG.debug(
+           "RangerSystemAccessControl.checkCanCreateTable(" + table.getSchemaTableName().getTableName() + ") denied");
+@@ -525,7 +525,7 @@ public void checkCanSetColumnComment(SystemSecurityContext context, CatalogSchem
+    */
+   @Override
+   public void checkCanCreateView(SystemSecurityContext context, CatalogSchemaTableName view) {
+-    if (!hasPermission(createResource(view.getCatalogName(), view.getSchemaTableName().getSchemaName()), context,
++    if (!hasPermission(createResource(view), context,
+         TrinoAccessType.CREATE)) {
+       LOG.debug(
+           "RangerSystemAccessControl.checkCanCreateView(" + view.getSchemaTableName().getTableName() + ") denied");
+diff --git a/plugin-trino/src/test/java/org/apache/ranger/authorization/trino/authorizer/RangerSystemAccessControlTest.java b/plugin-trino/src/test/java/org/apache/ranger/authorization/trino/authorizer/RangerSystemAccessControlTest.java
+index 7d97c74c5..dfee0e11d 100644
+--- a/plugin-trino/src/test/java/org/apache/ranger/authorization/trino/authorizer/RangerSystemAccessControlTest.java
++++ b/plugin-trino/src/test/java/org/apache/ranger/authorization/trino/authorizer/RangerSystemAccessControlTest.java
+@@ -150,6 +150,13 @@ public void testTableOperations() {
+     assertEquals(accessControlManager.filterTables(context(bob), "alice-catalog", aliceTables), ImmutableSet.of());
+ 
+     accessControlManager.checkCanCreateTable(context(alice), aliceTable, Map.of());
++    assertThrows(AccessDeniedException.class, () -> {
++      accessControlManager.checkCanCreateTable(
++              context(alice),
++              new CatalogSchemaTableName("alice-catalog", "schema", "wrong-table"),
++              Map.of()
++      );
++    });
+     accessControlManager.checkCanDropTable(context(alice), aliceTable);
+     accessControlManager.checkCanSelectFromColumns(context(alice), aliceTable, ImmutableSet.of());
+     accessControlManager.checkCanInsertIntoTable(context(alice), aliceTable);
+@@ -166,6 +173,12 @@ public void testTableOperations() {
+   @SuppressWarnings("PMD")
+   public void testViewOperations() {
+     accessControlManager.checkCanCreateView(context(alice), aliceView);
++    assertThrows(AccessDeniedException.class, () -> {
++      accessControlManager.checkCanCreateView(
++              context(alice),
++              new CatalogSchemaTableName("alice-catalog", "schema", "wrong-view")
++      );
++    });
+     accessControlManager.checkCanDropView(context(alice), aliceView);
+     accessControlManager.checkCanSelectFromColumns(context(alice), aliceView, ImmutableSet.of());
+     accessControlManager.checkCanCreateViewWithSelectFromColumns(context(alice), aliceTable, ImmutableSet.of());

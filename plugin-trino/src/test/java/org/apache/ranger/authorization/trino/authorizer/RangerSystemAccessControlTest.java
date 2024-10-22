@@ -150,6 +150,13 @@ public class RangerSystemAccessControlTest {
     assertEquals(accessControlManager.filterTables(context(bob), "alice-catalog", aliceTables), ImmutableSet.of());
 
     accessControlManager.checkCanCreateTable(context(alice), aliceTable, Map.of());
+    assertThrows(AccessDeniedException.class, () -> {
+      accessControlManager.checkCanCreateTable(
+              context(alice),
+              new CatalogSchemaTableName("alice-catalog", "schema", "wrong-table"),
+              Map.of()
+      );
+    });
     accessControlManager.checkCanDropTable(context(alice), aliceTable);
     accessControlManager.checkCanSelectFromColumns(context(alice), aliceTable, ImmutableSet.of());
     accessControlManager.checkCanInsertIntoTable(context(alice), aliceTable);
@@ -166,6 +173,12 @@ public class RangerSystemAccessControlTest {
   @SuppressWarnings("PMD")
   public void testViewOperations() {
     accessControlManager.checkCanCreateView(context(alice), aliceView);
+    assertThrows(AccessDeniedException.class, () -> {
+      accessControlManager.checkCanCreateView(
+              context(alice),
+              new CatalogSchemaTableName("alice-catalog", "schema", "wrong-view")
+      );
+    });
     accessControlManager.checkCanDropView(context(alice), aliceView);
     accessControlManager.checkCanSelectFromColumns(context(alice), aliceView, ImmutableSet.of());
     accessControlManager.checkCanCreateViewWithSelectFromColumns(context(alice), aliceTable, ImmutableSet.of());
