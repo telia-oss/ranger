@@ -1,0 +1,16 @@
+5a713177963989e6028e1918fd1c97e40c03023f:knox-agent/src/test/java/org/apache/ranger/services/knox/client/KnoxClientTest.java:curl-auth-user:24
+5a713177963989e6028e1918fd1c97e40c03023f:knox-agent/src/main/java/org/apache/ranger/services/knox/client/KnoxClient.java:curl-auth-user:51
+7defc061d6c3eab376e2413926a71f5b6ee0ad2e:lookup-client/src/main/java/com/xasecure/knox/client/KnoxClientTest.java:curl-auth-user:8
+7defc061d6c3eab376e2413926a71f5b6ee0ad2e:lookup-client/src/main/java/com/xasecure/knox/client/KnoxClientTest.java:curl-auth-user:9
+7defc061d6c3eab376e2413926a71f5b6ee0ad2e:lookup-client/src/main/java/com/xasecure/knox/client/KnoxClientTest.java:curl-auth-user:10
+7defc061d6c3eab376e2413926a71f5b6ee0ad2e:lookup-client/src/main/java/com/xasecure/knox/client/KnoxClientTest.java:curl-auth-user:11
+7defc061d6c3eab376e2413926a71f5b6ee0ad2e:lookup-client/src/main/java/com/xasecure/knox/client/KnoxClientTest.java:curl-auth-user:12
+7defc061d6c3eab376e2413926a71f5b6ee0ad2e:lookup-client/src/main/java/com/xasecure/knox/client/KnoxClientTest.java:curl-auth-user:13
+7defc061d6c3eab376e2413926a71f5b6ee0ad2e:lookup-client/src/main/java/com/xasecure/knox/client/KnoxClientTest.java:curl-auth-user:14
+7defc061d6c3eab376e2413926a71f5b6ee0ad2e:lookup-client/src/main/java/com/xasecure/knox/client/KnoxClient.java:curl-auth-user:45
+7defc061d6c3eab376e2413926a71f5b6ee0ad2e:lookup-client/src/main/java/com/xasecure/knox/client/KnoxClient.java:curl-auth-user:46
+7defc061d6c3eab376e2413926a71f5b6ee0ad2e:lookup-client/src/main/java/com/xasecure/knox/client/KnoxClient.java:curl-auth-user:47
+7defc061d6c3eab376e2413926a71f5b6ee0ad2e:lookup-client/src/main/java/com/xasecure/knox/client/KnoxClient.java:curl-auth-user:48
+7defc061d6c3eab376e2413926a71f5b6ee0ad2e:lookup-client/src/main/java/com/xasecure/knox/client/KnoxClient.java:curl-auth-user:49
+7defc061d6c3eab376e2413926a71f5b6ee0ad2e:lookup-client/src/main/java/com/xasecure/knox/client/KnoxClient.java:curl-auth-user:50
+7defc061d6c3eab376e2413926a71f5b6ee0ad2e:lookup-client/src/main/java/com/xasecure/knox/client/KnoxClient.java:curl-auth-user:51
