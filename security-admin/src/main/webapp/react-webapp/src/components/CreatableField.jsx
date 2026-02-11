@@ -19,6 +19,7 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import CreatableSelect from "react-select/creatable";
+import { selectInputCustomStyles } from "Components/CommonComponents";
 
 const CreatableField = (props) => {
   const { actionValues, creatableOnChange } = props;
@@ -33,12 +34,12 @@ const CreatableField = (props) => {
     }
   }, [actionValues]);
 
-  const handleChange = (value, input) => {
+  const handleChange = (value) => {
     setActionValue(value);
     creatableOnChange(value);
   };
 
-  const handleKeyDown = (e, input) => {
+  const handleKeyDown = (e) => {
     if (!actionInputValue) return;
     switch (e.key) {
       case "Enter":
@@ -51,8 +52,8 @@ const CreatableField = (props) => {
   };
 
   const createOption = (label) => ({
-    value: label,
-    label: label
+    value: label.trim(),
+    label: label.trim()
   });
 
   const handleInputChange = (value) => {
@@ -67,12 +68,13 @@ const CreatableField = (props) => {
       menuIsOpen={false}
       isClearable={false}
       isMulti
-      placeholder="Type Action Name"
+      placeholder="Type Operations Name"
       value={actionValue}
       inputValue={actionInputValue}
       onChange={(actionValue) => handleChange(actionValue)}
       onInputChange={handleInputChange}
       onKeyDown={(e) => handleKeyDown(e)}
+      styles={selectInputCustomStyles}
     />
   );
 };

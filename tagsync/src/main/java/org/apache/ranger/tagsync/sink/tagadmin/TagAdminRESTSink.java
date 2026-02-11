@@ -20,7 +20,7 @@
 package org.apache.ranger.tagsync.sink.tagadmin;
 
 import com.sun.jersey.api.client.ClientResponse;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ranger.admin.client.datatype.RESTResponse;
 import org.apache.ranger.plugin.util.RangerRESTClient;
@@ -85,7 +85,7 @@ public class TagAdminRESTSink implements TagSink, Runnable {
         LOG.debug("isKerberized={}", isKerberized);
 
         if (StringUtils.isNotBlank(restUrl)) {
-            tagRESTClient = new RangerRESTClient(restUrl, sslConfigFile, TagSyncConfig.getInstance());
+            tagRESTClient = new RangerRESTClient(restUrl, sslConfigFile, TagSyncConfig.getInstance(), "ranger.tagsync");
 
             if (!isKerberized) {
                 tagRESTClient.setBasicAuthInfo(userName, password);
@@ -178,6 +178,17 @@ public class TagAdminRESTSink implements TagSink, Runnable {
                 } catch (InterruptedException exception) {
                     LOG.error("Interrupted..: ", exception);
 
+                    return;
+                }
+            } else {
+                try {
+                    long sleepInterval = TagSyncConfig.getTagSyncHAPassiveSleepInterval();
+                    LOG.debug("Sleeping for [{}] milliSeconds as this server is running in passive mode", sleepInterval);
+                    Thread.sleep(sleepInterval);
+                } catch (InterruptedException interrupted) {
+                    LOG.error("Interrupted..: ", interrupted);
+                    // preserve interrupt status for caller of the thread
+                    Thread.currentThread().interrupt();
                     return;
                 }
             }

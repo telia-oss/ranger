@@ -21,15 +21,17 @@ package org.apache.ranger.plugin.policyengine;
 
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.ranger.authorization.hadoop.config.RangerPluginConfig;
 import org.apache.ranger.authorization.utils.StringUtil;
 import org.apache.ranger.plugin.contextenricher.RangerTagForEval;
+import org.apache.ranger.plugin.model.RangerInlinePolicy;
 import org.apache.ranger.plugin.model.RangerPolicy;
 import org.apache.ranger.plugin.model.RangerServiceDef;
 import org.apache.ranger.plugin.model.validation.RangerServiceDefHelper;
 import org.apache.ranger.plugin.policyengine.gds.GdsAccessResult;
+import org.apache.ranger.plugin.policyevaluator.RangerInlinePolicyEvaluator;
 import org.apache.ranger.plugin.policyevaluator.RangerPolicyEvaluator;
 import org.apache.ranger.plugin.policyresourcematcher.RangerPolicyResourceMatcher.MatchType;
 import org.apache.ranger.plugin.service.RangerDefaultRequestProcessor;
@@ -617,6 +619,8 @@ public class RangerPolicyEngineImpl implements RangerPolicyEngine {
 
         updateFromGdsResult(ret);
 
+        evaluateInlinePolicy(request, ret);
+
         LOG.debug("<== RangerPolicyEngineImpl.zoneAwareAccessEvaluationWithNoAudit({}, policyType ={}): {}", request, policyType, ret);
 
         return ret;
@@ -1072,12 +1076,25 @@ public class RangerPolicyEngineImpl implements RangerPolicyEngine {
 
         if (gdsResult != null) {
             if (result.getPolicyType() == RangerPolicy.POLICY_TYPE_ACCESS) {
+                // pick access result from GDS policies only if there is no decision yet
                 if (!result.getIsAccessDetermined() && gdsResult.getIsAllowed()) {
-                    result.setIsAllowed(true);
-                    result.setIsAccessDetermined(true);
-                    result.setPolicyId(gdsResult.getPolicyId());
-                    result.setPolicyVersion(gdsResult.getPolicyVersion());
-                    result.setPolicyPriority(RangerPolicy.POLICY_PRIORITY_NORMAL);
+                    copyFromGdsResult(gdsResult, result);
+                }
+            } else if (result.getPolicyType() == RangerPolicy.POLICY_TYPE_ROWFILTER) {
+                // pick row-filter from GDS policies only if there is no decision yet
+                if (result.getPolicyId() == -1 && CollectionUtils.isNotEmpty(gdsResult.getRowFilters())) {
+                    copyFromGdsResult(gdsResult, result);
+
+                    result.setFilterExpr(gdsResult.getRowFilters().get(0));
+                }
+            } else if (result.getPolicyType() == RangerPolicy.POLICY_TYPE_DATAMASK) {
+                // pick data-mask from GDS policies only if there is no decision yet
+                if (result.getPolicyId() == -1 && StringUtils.isNotEmpty(gdsResult.getMaskType())) {
+                    copyFromGdsResult(gdsResult, result);
+
+                    result.setMaskType(gdsResult.getMaskType());
+                    result.setMaskedValue(gdsResult.getMaskedValue());
+                    result.setMaskCondition(gdsResult.getMaskCondition());
                 }
             }
 
@@ -1092,6 +1109,32 @@ public class RangerPolicyEngineImpl implements RangerPolicyEngine {
         }
 
         LOG.debug("<== updateFromGdsResult(result={})", result);
+    }
+
+    private void copyFromGdsResult(GdsAccessResult gdsResult, RangerAccessResult result) {
+        if (gdsResult != null && result != null) {
+            result.setIsAllowed(true);
+            result.setIsAccessDetermined(true);
+            result.setPolicyId(gdsResult.getPolicyId());
+            result.setPolicyVersion(gdsResult.getPolicyVersion());
+            result.setPolicyPriority(RangerPolicy.POLICY_PRIORITY_NORMAL);
+        }
+    }
+
+    private void evaluateInlinePolicy(RangerAccessRequest request, RangerAccessResult result) {
+        if (request != null && result != null) {
+            RangerInlinePolicy inlinePolicy = request.getInlinePolicy();
+
+            if (inlinePolicy != null) {
+                LOG.debug("Evaluating inline policy: {}", inlinePolicy);
+
+                RangerInlinePolicyEvaluator evaluator = new RangerInlinePolicyEvaluator(inlinePolicy, this);
+
+                result.incrementEvaluatedPoliciesCount();
+
+                evaluator.evaluate(request, result);
+            }
+        }
     }
 
     private static class ServiceConfig {

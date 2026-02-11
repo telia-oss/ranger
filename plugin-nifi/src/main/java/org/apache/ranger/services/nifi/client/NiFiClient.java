@@ -27,7 +27,7 @@ import com.sun.jersey.api.client.config.ClientConfig;
 import com.sun.jersey.api.client.config.DefaultClientConfig;
 import com.sun.jersey.client.urlconnection.HTTPSProperties;
 import org.apache.commons.io.IOUtils;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.ranger.plugin.client.BaseClient;
 import org.apache.ranger.plugin.service.ResourceLookupContext;
 import org.slf4j.Logger;
@@ -168,14 +168,15 @@ public class NiFiClient {
         @Override
         public boolean verify(final String hostname, final SSLSession ssls) {
             try {
-                for (final Certificate peerCertificate : ssls.getPeerCertificates()) {
-                    if (peerCertificate instanceof X509Certificate) {
-                        final X509Certificate x509Cert        = (X509Certificate) peerCertificate;
-                        final List<String>    subjectAltNames = getSubjectAlternativeNames(x509Cert);
-                        if (subjectAltNames.contains(hostname.toLowerCase())) {
-                            return true;
-                        }
-                    }
+                Certificate[] certificates = ssls.getPeerCertificates();
+                if (certificates == null || certificates.length == 0) {
+                    return false;
+                }
+                // verify hostname against server certificate[0]
+                if (certificates[0] instanceof X509Certificate) {
+                    final X509Certificate x509Cert = (X509Certificate) certificates[0];
+                    final List<String> subjectAltNames = getSubjectAlternativeNames(x509Cert);
+                    return subjectAltNames.contains(hostname.toLowerCase());
                 }
             } catch (final SSLPeerUnverifiedException | CertificateParsingException ex) {
                 LOG.warn("Hostname Verification encountered exception verifying hostname due to: {}", ex, ex);

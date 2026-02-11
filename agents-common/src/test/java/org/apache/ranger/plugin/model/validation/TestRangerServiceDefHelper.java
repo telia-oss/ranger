@@ -20,13 +20,15 @@
 package org.apache.ranger.plugin.model.validation;
 
 import org.apache.hadoop.thirdparty.com.google.common.collect.Lists;
+import org.apache.ranger.authorization.utils.JsonUtils;
 import org.apache.ranger.plugin.model.RangerPolicy;
 import org.apache.ranger.plugin.model.RangerServiceDef;
 import org.apache.ranger.plugin.model.RangerServiceDef.RangerResourceDef;
 import org.apache.ranger.plugin.model.validation.RangerServiceDefHelper.Delegate;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
+import java.io.InputStreamReader;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.GregorianCalendar;
@@ -34,10 +36,13 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotSame;
-import static org.junit.Assert.assertSame;
-import static org.junit.Assert.assertTrue;
+import static java.util.Objects.requireNonNull;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -45,7 +50,7 @@ public class TestRangerServiceDefHelper {
     private RangerServiceDef       serviceDef;
     private RangerServiceDefHelper helper;
 
-    @Before
+    @BeforeEach
     public void before() {
         serviceDef = mock(RangerServiceDef.class);
 
@@ -124,7 +129,7 @@ public class TestRangerServiceDefHelper {
 
         helper = new RangerServiceDefHelper(serviceDef);
 
-        assertFalse("Graph was valid!", helper.isResourceGraphValid());
+        assertFalse(helper.isResourceGraphValid(), "Graph was valid!");
     }
 
     @Test
@@ -174,7 +179,7 @@ public class TestRangerServiceDefHelper {
             expectedHierarchies.remove(resourceNames);
         }
 
-        assertTrue("Missing hierarchies: " + expectedHierarchies, expectedHierarchies.isEmpty()); // make sure we got back all hierarchies
+        assertTrue(expectedHierarchies.isEmpty(), "Missing hierarchies: " + expectedHierarchies); // make sure we got back all hierarchies
     }
 
     @Test
@@ -222,7 +227,7 @@ public class TestRangerServiceDefHelper {
             expectedHierarchies.remove(resourceNames);
         }
 
-        assertTrue("Missing hierarchies: " + expectedHierarchies, expectedHierarchies.isEmpty()); // make sure we got back all hierarchies
+        assertTrue(expectedHierarchies.isEmpty(), "Missing hierarchies: " + expectedHierarchies); // make sure we got back all hierarchies
     }
 
     @Test
@@ -249,7 +254,7 @@ public class TestRangerServiceDefHelper {
         // since cache has it, we should get back the one that we have added
         helper = new RangerServiceDefHelper(serviceDef);
 
-        assertSame("Didn't get back the same object that was put in cache", delegate, helper.delegate);
+        assertSame(delegate, helper.delegate, "Didn't get back the same object that was put in cache");
 
         // if we change the date then that should force helper to create a new delegate instance
         /*
@@ -260,14 +265,14 @@ public class TestRangerServiceDefHelper {
 
         helper = new RangerServiceDefHelper(serviceDef);
 
-        assertNotSame("Didn't get a delegate different than what was put in the cache", delegate, helper.delegate);
+        assertNotSame(delegate, helper.delegate, "Didn't get a delegate different than what was put in the cache");
 
         // now that a new instance was added to the cache let's ensure that it got added to the cache
         Delegate newDelegate = helper.delegate;
 
         helper = new RangerServiceDefHelper(serviceDef);
 
-        assertSame("Didn't get a delegate different than what was put in the cache", newDelegate, helper.delegate);
+        assertSame(newDelegate, helper.delegate, "Didn't get a delegate different than what was put in the cache");
     }
 
     @Test
@@ -369,6 +374,30 @@ public class TestRangerServiceDefHelper {
         helper = new RangerServiceDefHelper(serviceDef);
 
         assertFalse(helper.isResourceGraphValid());
+    }
+
+    @Test
+    public void testRrnTemplateHive() {
+        InputStreamReader      reader       = new InputStreamReader(requireNonNull(this.getClass().getResourceAsStream("/admin/service-defs/test-hive-servicedef.json")));
+        RangerServiceDef       svcDef       = JsonUtils.jsonToObject(reader, RangerServiceDef.class);
+        RangerServiceDefHelper svcDefHelper = new RangerServiceDefHelper(svcDef);
+
+        assertEquals("database", svcDefHelper.getRrnTemplate("database"));
+        assertEquals("database/table", svcDefHelper.getRrnTemplate("table"));
+        assertEquals("database/table/column", svcDefHelper.getRrnTemplate("column"));
+        assertEquals("database/udf", svcDefHelper.getRrnTemplate("udf"));
+        assertEquals("url", svcDefHelper.getRrnTemplate("url"));
+        assertNull(svcDefHelper.getRrnTemplate("unknown-resource"));
+    }
+
+    @Test
+    public void testRrnTemplateS3() {
+        InputStreamReader      reader       = new InputStreamReader(requireNonNull(this.getClass().getResourceAsStream("/admin/service-defs/test-s3-servicedef.json")));
+        RangerServiceDef       svcDef       = JsonUtils.jsonToObject(reader, RangerServiceDef.class);
+        RangerServiceDefHelper svcDefHelper = new RangerServiceDefHelper(svcDef);
+
+        assertEquals("bucket", svcDefHelper.getRrnTemplate("bucket"));
+        assertEquals("bucket/path", svcDefHelper.getRrnTemplate("path"));
     }
 
     RangerResourceDef createResourceDef(String name, String parent) {

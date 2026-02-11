@@ -20,7 +20,7 @@
 package org.apache.ranger.db;
 
 import org.apache.commons.collections.CollectionUtils;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.ranger.authorization.utils.StringUtil;
 import org.apache.ranger.common.DateUtil;
 import org.apache.ranger.common.GUIDUtil;
@@ -247,11 +247,18 @@ public class XXRMSServiceResourceDao extends BaseDao<XXRMSServiceResource> {
     }
 
     public void purge(long serviceId) {
-        getEntityManager().createNamedQuery("XXRMSNotification.deleteByServiceId")
+        List<Long> serviceResourceIds = getEntityManager()
+                .createNamedQuery("XXRMSServiceResource.getByServiceId", Long.class)
                 .setParameter("serviceId", serviceId)
-                .executeUpdate();
+                .getResultList();
 
-        getEntityManager().createNamedQuery("XXRMSResourceMapping.deleteByServiceId")
+        if (!serviceResourceIds.isEmpty()) {
+            getEntityManager().createNamedQuery("XXRMSResourceMapping.deleteByServiceIds")
+                .setParameter("ids", serviceResourceIds)
+                .executeUpdate();
+        }
+
+        getEntityManager().createNamedQuery("XXRMSNotification.deleteByServiceId")
                 .setParameter("serviceId", serviceId)
                 .executeUpdate();
 

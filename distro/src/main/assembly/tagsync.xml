@@ -50,13 +50,16 @@
 							<include>org.apache.atlas:atlas-client-v2:jar:${atlas.version}</include>
 							<include>org.apache.atlas:atlas-client-common:jar:${atlas.version}</include>
 							<include>org.apache.atlas:atlas-common:jar:${atlas.version}</include>
-							<include>org.apache.hadoop:hadoop-auth</include>
-							<include>org.apache.hadoop:hadoop-common</include>
+							<include>org.apache.hadoop:hadoop-auth:jar:${hadoop.version}</include>
+							<include>org.apache.hadoop:hadoop-client-api:jar:${hadoop.version}</include>
+							<include>org.apache.hadoop:hadoop-client-runtime:jar:${hadoop.version}</include>
 							<include>org.apache.commons:commons-compress</include>
 							<include>org.apache.kafka:kafka-clients:jar:${kafka.version}</include>
 							<include>org.apache.ranger:credentialbuilder</include>
+							<include>org.apache.ranger:ranger-authz-api</include>
 							<include>org.apache.ranger:ranger-plugins-cred</include>
 							<include>org.apache.ranger:ranger-plugins-common</include>
+							<include>org.apache.ranger:ugsync-util</include>
 							<include>org.apache.ranger:ranger-util</include>
 							<include>org.apache.zookeeper:zookeeper:jar:${zookeeper.version}</include>
 							<include>com.fasterxml.jackson.core:jackson-annotations:jar:${atlas.jackson.version}</include>
@@ -74,7 +77,7 @@
 							<include>commons-collections:commons-collections:jar:${commons.collections.version}</include>
 							<include>commons-configuration:commons-configuration:jar:${commons.configuration1.version}</include>
 							<include>commons-io:commons-io:jar:${commons.io.version}</include>
-							<include>commons-lang:commons-lang:jar:${commons.lang.version}</include>
+							<include>commons-lang:commons-lang</include>
 							<include>commons-logging:commons-logging:jar:${commons.logging.version}</include>
 							<include>javax.inject:javax.inject:jar:${javax-inject.version}</include>
 							<include>joda-time:joda-time:jar:${joda-time.version}</include>
@@ -85,6 +88,7 @@
 							<include>net.java.dev.jna:jna-platform:jar:${jna-platform.version}</include>
 							<include>com.fasterxml.woodstox:woodstox-core:jar:${fasterxml.woodstox.version}</include>
 							<include>org.codehaus.woodstox:stax2-api:jar:${codehaus.woodstox.stax2api.version}</include>
+							<include>org.apache.commons:commons-collections4:jar:${commons.collections4.version}</include>
 							<include>org.apache.commons:commons-configuration2:jar:${commons.configuration.version}</include>
 							<include>org.cloudera.logredactor:logredactor</include>
 							<include>org.apache.commons:commons-lang3</include>
@@ -97,7 +101,8 @@
 							<include>org.apache.curator:curator-client:jar:${curator.version}</include>
 							<include>org.apache.zookeeper:zookeeper:jar:${zookeeper.version}</include>
 							<include>org.apache.zookeeper:zookeeper-jute:jar:${zookeeper.version}</include>
-                                                        <include>org.apache.hadoop.thirdparty:hadoop-shaded-guava:jar:${hadoop-shaded-guava.version}</include>
+							<include>com.google.guava:guava</include>
+							<include>org.apache.hadoop.thirdparty:hadoop-shaded-guava:jar:${hadoop-shaded-guava.version}</include>
 						</includes>
 					</dependencySet>
 				</dependencySets>

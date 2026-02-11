@@ -26,7 +26,8 @@ import { filter, groupBy, some } from "lodash";
 import { toast } from "react-toastify";
 import { udfResourceWarning } from "../../utils/XAMessages";
 import ResourceSelectComp from "./ResourceSelectComp";
-import { getResourcesDefVal } from "../../utils/XAUtils";
+import { getResourcesDefVal } from "Utils/XAUtils";
+import { selectInputCustomStyles } from "Components/CommonComponents";
 
 const noneOptions = {
   label: "None",
@@ -133,17 +134,17 @@ export default function ResourceComp(props) {
       delete formValues[`isRecursiveSupport-${levelKey}`];
     }
     delete formValues[`value-${grpResourcesKeys[index]}`];
-    let CurrentSelectedResourcs = selectedVal.name;
+    let currentSelectedResources = selectedVal.name;
     for (let j = index + 1; j < grpResourcesKeys.length; j++) {
       let level = grpResourcesKeys[j];
       let nextResource = resources.find((m) => {
         if (m?.parent) {
-          return m.parent === CurrentSelectedResourcs;
+          return m.parent === currentSelectedResources;
         }
       });
       if (nextResource) {
         formValues[`resourceName-${level}`] = nextResource;
-        CurrentSelectedResourcs = nextResource.name;
+        currentSelectedResources = nextResource.name;
       }
     }
 
@@ -207,6 +208,8 @@ export default function ResourceComp(props) {
                           handleResourceChange(value, input, index)
                         }
                         isSearchable={false}
+                        styles={selectInputCustomStyles}
+                        tabSelectsValue={false}
                       />
                     </span>
                     <RenderValidateField name={`resourceName-${levelKey}`} />

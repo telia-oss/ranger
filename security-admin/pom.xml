@@ -28,7 +28,7 @@
     <description>security-admin-tool java web application</description>
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <skipJSTests>false</skipJSTests>
+        <skipJSCoverage>true</skipJSCoverage>
     </properties>
     <dependencies>
         <dependency>
@@ -182,7 +182,6 @@
                 </exclusion>
             </exclusions>
         </dependency>
-
         <dependency>
             <groupId>com.webcohesion.enunciate</groupId>
             <artifactId>enunciate-core-annotations</artifactId>
@@ -234,11 +233,6 @@
             <version>${commons.io.version}</version>
         </dependency>
         <dependency>
-            <groupId>commons-lang</groupId>
-            <artifactId>commons-lang</artifactId>
-            <version>${commons.lang.version}</version>
-        </dependency>
-        <dependency>
             <groupId>commons-net</groupId>
             <artifactId>commons-net</artifactId>
             <version>${commons.net.version}</version>
@@ -286,6 +280,11 @@
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-configuration2</artifactId>
             <version>${commons.configuration.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-lang3</artifactId>
+            <version>${commons.lang3.version}</version>
         </dependency>
         <dependency>
             <groupId>org.apache.commons</groupId>
@@ -389,37 +388,6 @@
                 <exclusion>
                     <groupId>tomcat</groupId>
                     <artifactId>jasper-runtime</artifactId>
-                </exclusion>
-            </exclusions>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.hadoop</groupId>
-            <artifactId>hadoop-hdfs</artifactId>
-            <version>${hadoop.version}</version>
-            <exclusions>
-                <exclusion>
-                    <groupId>com.google.guava</groupId>
-                    <artifactId>guava</artifactId>
-                </exclusion>
-                <exclusion>
-                    <groupId>com.sun.jersey</groupId>
-                    <artifactId>jersey-core</artifactId>
-                </exclusion>
-                <exclusion>
-                    <groupId>com.sun.jersey</groupId>
-                    <artifactId>jersey-server</artifactId>
-                </exclusion>
-                <exclusion>
-                    <groupId>io.netty</groupId>
-                    <artifactId>netty</artifactId>
-                </exclusion>
-                <exclusion>
-                    <groupId>log4j</groupId>
-                    <artifactId>*</artifactId>
-                </exclusion>
-                <exclusion>
-                    <groupId>org.slf4j</groupId>
-                    <artifactId>*</artifactId>
                 </exclusion>
             </exclusions>
         </dependency>
@@ -541,6 +509,16 @@
                     <artifactId>*</artifactId>
                 </exclusion>
             </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.ranger</groupId>
+            <artifactId>ranger-audit-dest-cloudwatch</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.ranger</groupId>
+            <artifactId>ranger-audit-dest-es</artifactId>
+            <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>org.apache.ranger</groupId>
@@ -698,11 +676,6 @@
             <version>${cglib.version}</version>
         </dependency>
         <dependency>
-            <groupId>org.slf4j</groupId>
-            <artifactId>log4j-over-slf4j</artifactId>
-            <version>${slf4j.version}</version>
-        </dependency>
-        <dependency>
             <groupId>org.springframework</groupId>
             <artifactId>spring-aop</artifactId>
             <version>${springframework.version}</version>
@@ -807,20 +780,69 @@
 
         <!-- Test -->
         <dependency>
-            <groupId>org.junit.jupiter</groupId>
-            <artifactId>junit-jupiter-api</artifactId>
-            <version>${junit.jupiter.version}</version>
+            <groupId>org.apache.ranger</groupId>
+            <artifactId>ranger-audit-dest-hdfs</artifactId>
+            <version>${project.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>org.junit.vintage</groupId>
-            <artifactId>junit-vintage-engine</artifactId>
-            <version>${junit.jupiter.version}</version>
+            <groupId>org.apache.ranger</groupId>
+            <artifactId>ranger-audit-orc-util</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.hamcrest</groupId>
+            <artifactId>hamcrest</artifactId>
+            <version>${hamcrest.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>5.7.2</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-api</artifactId>
+            <version>5.7.2</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-engine</artifactId>
+            <version>5.7.2</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.platform</groupId>
+            <artifactId>junit-platform-commons</artifactId>
+            <version>1.7.2</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.platform</groupId>
+            <artifactId>junit-platform-engine</artifactId>
+            <version>1.7.2</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.mockito</groupId>
             <artifactId>mockito-core</artifactId>
+            <version>${mockito.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-inline</artifactId>
+            <version>${mockito.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-junit-jupiter</artifactId>
+            <version>${mockito.version}</version>
             <scope>test</scope>
         </dependency>
     </dependencies>
@@ -836,7 +858,7 @@
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-surefire-plugin</artifactId>
-                    <version>2.18.1</version>
+                    <version>${maven.surefire.plugin.version}</version>
                     <configuration>
                         <skipTests>${skipTests}</skipTests>
                         <additionalClasspathElements>
@@ -874,42 +896,9 @@
                             <packagingExcludes>WEB-INF/lib/spring-*.SEC03.jar,
                                 WEB-INF/lib/spring-*.RC3.jar,
                                 WEB-INF/lib/spring-2.*.jar,
-                                WEB-INF/lib/jetty-*.jar</packagingExcludes>
+                                WEB-INF/lib/jetty-*.jar,
+                                WEB-INF/lib/hadoop-client-api-*.jar</packagingExcludes>
                             <warSourceDirectory>${project.build.directory}/${project.build.finalName}</warSourceDirectory>
-                        </configuration>
-                    </execution>
-                </executions>
-            </plugin>
-            <plugin>
-                <groupId>com.google.code.maven-replacer-plugin</groupId>
-                <artifactId>replacer</artifactId>
-                <version>1.5.3</version>
-                <executions>
-                    <execution>
-                        <goals>
-                            <goal>replace</goal>
-                        </goals>
-                        <phase>prepare-package</phase>
-                        <configuration>
-                            <basedir>${project.build.directory}/${project.build.finalName}</basedir>
-                            <includes>
-                                <include>backbone-index.html</include>
-                                <include>scripts/Init.js</include>
-                            </includes>
-                            <replacements>
-                                <replacement>
-                                    <token>build.version</token>
-                                    <value>${project.version}</value>
-                                </replacement>
-                                <replacement>
-                                    <token>(?m)\&lt;\!-- *dev *--\&gt;(.*)$</token>
-                                    <value>\&lt;\!-- dev $1 --\&gt;</value>
-                                </replacement>
-                                <replacement>
-                                    <token>\&lt;\!-- *prod *(.*) *--\&gt;</token>
-                                    <value>\&lt;\!-- prod --\&gt;$1</value>
-                                </replacement>
-                            </replacements>
                         </configuration>
                     </execution>
                 </executions>
@@ -939,44 +928,6 @@
                 <artifactId>maven-resources-plugin</artifactId>
                 <version>2.7</version>
                 <executions>
-                    <execution>
-                        <id>copy-resources</id>
-                        <goals>
-                            <goal>copy-resources</goal>
-                        </goals>
-                        <phase>validate</phase>
-                        <configuration>
-                            <outputDirectory>${project.build.directory}/jsmain</outputDirectory>
-                            <resources>
-                                <resource>
-                                    <directory>${basedir}/src/main/webapp</directory>
-                                    <includes>
-                                        <include>package.json</include>
-                                        <include>package-lock.json</include>
-                                    </includes>
-                                </resource>
-                            </resources>
-                        </configuration>
-                    </execution>
-                    <execution>
-                        <id>copy-js-test-resources</id>
-                        <goals>
-                            <goal>copy-resources</goal>
-                        </goals>
-                        <phase>validate</phase>
-                        <configuration>
-                            <outputDirectory>${project.build.directory}/jstest</outputDirectory>
-                            <resources>
-                                <resource>
-                                    <directory>${basedir}/src/test/javascript</directory>
-                                    <includes>
-                                        <include>package.json</include>
-                                        <include>package-lock.json</include>
-                                    </includes>
-                                </resource>
-                            </resources>
-                        </configuration>
-                    </execution>
                     <!-- react-webapp copy-resources execution start -->
                     <execution>
                         <id>copy-resources-react-webapp</id>
@@ -1079,82 +1030,6 @@
                     <installDirectory>${project.build.directory}</installDirectory>
                 </configuration>
                 <executions>
-                    <execution>
-                        <id>install node and npm</id>
-                        <goals>
-                            <goal>install-node-and-npm</goal>
-                        </goals>
-                        <phase>process-resources</phase>
-                        <configuration>
-                            <nodeVersion>v8.12.0</nodeVersion>
-                            <npmVersion>6.4.1</npmVersion>
-                        </configuration>
-                    </execution>
-                    <execution>
-                        <id>npm install for packaging</id>
-                        <goals>
-                            <goal>npm</goal>
-                        </goals>
-                        <phase>prepare-package</phase>
-                        <configuration>
-                            <workingDirectory>${project.build.directory}/jsmain</workingDirectory>
-                            <arguments>install</arguments>
-                        </configuration>
-                    </execution>
-                    <execution>
-                        <id>npm run r.js</id>
-                        <goals>
-                            <goal>npm</goal>
-                        </goals>
-                        <phase>prepare-package</phase>
-                        <configuration>
-                            <workingDirectory>${project.build.directory}/jsmain</workingDirectory>
-                            <arguments>run r.js -- -o ../${project.build.finalName}/minify.build.js</arguments>
-                        </configuration>
-                    </execution>
-                    <execution>
-                        <id>npm install for tests</id>
-                        <goals>
-                            <goal>npm</goal>
-                        </goals>
-                        <phase>test</phase>
-                        <configuration>
-                            <skip>${skipJSTests}</skip>
-                            <workingDirectory>${project.build.directory}/jstest</workingDirectory>
-                            <arguments>install</arguments>
-                        </configuration>
-                    </execution>
-                    <execution>
-                        <id>karma dev</id>
-                        <goals>
-                            <goal>karma</goal>
-                        </goals>
-                        <phase>test</phase>
-                        <configuration>
-                            <environmentVariables>
-                                <OPENSSL_CONF>/etc/ssl/</OPENSSL_CONF>
-                            </environmentVariables>
-                            <skip>${skipJSTests}</skip>
-                            <workingDirectory>${project.build.directory}/jstest</workingDirectory>
-                            <karmaConfPath>../../src/test/javascript/karma-dev.conf.js</karmaConfPath>
-                        </configuration>
-                    </execution>
-                    <execution>
-                        <id>karma prd</id>
-                        <goals>
-                            <goal>karma</goal>
-                        </goals>
-                        <phase>integration-test</phase>
-                        <configuration>
-                            <environmentVariables>
-                                <buildDir>${project.build.finalName}</buildDir>
-                                <OPENSSL_CONF>/etc/ssl/</OPENSSL_CONF>
-                            </environmentVariables>
-                            <skip>${skipJSTests}</skip>
-                            <workingDirectory>${project.build.directory}/jstest</workingDirectory>
-                            <karmaConfPath>../../src/test/javascript/karma-prd.conf.js</karmaConfPath>
-                        </configuration>
-                    </execution>
                     <!-- react-webapp frontend-maven-plugin start -->
                     <execution>
                         <id>install node and npm for react-webapp</id>
@@ -1165,8 +1040,34 @@
                         <configuration>
                             <workingDirectory>${project.build.directory}/react-webapp</workingDirectory>
                             <installDirectory>${project.build.directory}/react-build</installDirectory>
-                            <nodeVersion>v16.0.0</nodeVersion>
-                            <npmVersion>7.10.0</npmVersion>
+                            <nodeVersion>v20.19.5</nodeVersion>
+                            <npmVersion>10.8.2</npmVersion>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>update-babel-config for react-webapp</id>
+                        <goals>
+                            <goal>npm</goal>
+                        </goals>
+                        <phase>generate-resources</phase>
+                        <configuration>
+                            <workingDirectory>${project.build.directory}/react-webapp</workingDirectory>
+                            <installDirectory>${project.build.directory}/react-build</installDirectory>
+                            <arguments>run update-babel-config</arguments>
+                            <skip>${skipJSCoverage}</skip>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>install-babel-coverage for react-webapp</id>
+                        <goals>
+                            <goal>npm</goal>
+                        </goals>
+                        <phase>generate-resources</phase>
+                        <configuration>
+                            <workingDirectory>${project.build.directory}/react-webapp</workingDirectory>
+                            <installDirectory>${project.build.directory}/react-build</installDirectory>
+                            <arguments>install --save-dev @babel/preset-react@7.27.1 @babel/preset-env@7.28.0 babel-plugin-istanbul</arguments>
+                            <skip>${skipJSCoverage}</skip>
                         </configuration>
                     </execution>
                     <execution>

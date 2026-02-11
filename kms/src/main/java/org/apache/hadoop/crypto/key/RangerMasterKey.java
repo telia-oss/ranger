@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.crypto.key;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.sun.org.apache.xml.internal.security.utils.Base64;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.hadoop.thirdparty.com.google.common.base.Joiner;
@@ -34,13 +35,13 @@ import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
 import javax.crypto.SecretKeyFactory;
 import javax.crypto.spec.PBEKeySpec;
-import javax.crypto.spec.PBEParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
 import java.security.Key;
 import java.security.KeyStore;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.security.spec.AlgorithmParameterSpec;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
@@ -48,14 +49,17 @@ import java.util.Properties;
 public class RangerMasterKey implements RangerKMSMKI {
     private static final Logger logger = LoggerFactory.getLogger(RangerMasterKey.class);
 
+    public static final int PADDING_STRING_ELEM_COUNT = 7;
     public  static final String     DBKS_SITE_XML           = "dbks-site.xml";
     private static final String     DEFAULT_MK_CIPHER       = "AES";
     private static final int        DEFAULT_MK_KeySize      = 256;
     private static final int        DEFAULT_SALT_SIZE       = 8;
     private static final String     DEFAULT_SALT            = "abcdefghijklmnopqrstuvwxyz01234567890";
-    private static final String     DEFAULT_CRYPT_ALGO      = "PBEWithMD5AndTripleDES";
     private static final int        DEFAULT_ITERATION_COUNT = 1000;
     private static final Properties serverConfigProperties  = new Properties();
+
+    private static SupportedPBECryptoAlgo defaultCryptAlgo = SupportedPBECryptoAlgo.PBEWithMD5AndTripleDES;
+    private static SupportedPBECryptoAlgo encrCryptoAlgo   = defaultCryptAlgo;
 
     public  static String  mkCipher;
     public  static Integer mkKeySize = 0;
@@ -67,15 +71,17 @@ public class RangerMasterKey implements RangerKMSMKI {
     public  static String  paddingString;
     private static String password;
     private static String defaultMdAlgo;
+    private static boolean isFipsEnabled;
 
     private final RangerMasterKeyDao masterKeyDao;
 
     public RangerMasterKey() {
-        this.masterKeyDao = null;
+        this(null);
     }
 
     public RangerMasterKey(DaoManager daoManager) {
         this.masterKeyDao = daoManager != null ? daoManager.getRangerMasterKeyDao() : null;
+        init();
     }
 
     public static void getPasswordParam(String paddedEncryptedPwd) {
@@ -88,22 +94,23 @@ public class RangerMasterKey implements RangerKMSMKI {
         if (encryptedPwd != null && encryptedPwd.length >= 7) {
             int index = 0;
 
-            mkCipher       = encryptedPwd[index];
-            mkKeySize      = Integer.parseInt(encryptedPwd[++index]);
-            saltSize       = Integer.parseInt(encryptedPwd[++index]);
-            pbeAlgo        = encryptedPwd[++index];
-            mdAlgo         = encryptedPwd[++index];
-            iterationCount = Integer.parseInt(encryptedPwd[++index]);
-            salt           = encryptedPwd[++index];
-            password       = encryptedPwd[++index];
+            mkCipher            = encryptedPwd[index];
+            mkKeySize           = Integer.parseInt(encryptedPwd[++index]);
+            int tempSaltSize    = Integer.parseInt(encryptedPwd[++index]);
+            pbeAlgo             = encryptedPwd[++index];
+            saltSize            = calculateCompliantSaltSize(tempSaltSize, SupportedPBECryptoAlgo.valueOf(pbeAlgo));
+            mdAlgo              = encryptedPwd[++index];
+            iterationCount      = Integer.parseInt(encryptedPwd[++index]);
+            salt                = encryptedPwd[++index];
+            password            = encryptedPwd[++index];
         } else {
-            mkCipher  = DEFAULT_MK_CIPHER;
-            mkKeySize = DEFAULT_MK_KeySize;
-            saltSize  = DEFAULT_SALT_SIZE;
-            pbeAlgo   = DEFAULT_CRYPT_ALGO;
-            mdAlgo    = defaultMdAlgo;
-            password  = paddedEncryptedPwd;
-            salt      = password;
+            mkCipher            = DEFAULT_MK_CIPHER;
+            mkKeySize           = DEFAULT_MK_KeySize;
+            pbeAlgo             = isFipsEnabled ? SupportedPBECryptoAlgo.PBEWithMD5AndTripleDES.getAlgoName() : defaultCryptAlgo.getAlgoName();
+            saltSize            = calculateCompliantSaltSize(DEFAULT_SALT_SIZE, SupportedPBECryptoAlgo.valueOf(pbeAlgo));
+            mdAlgo              = defaultMdAlgo;
+            password            = paddedEncryptedPwd;
+            salt                = password;
 
             if (password != null) {
                 iterationCount = password.toCharArray().length + 1;
@@ -170,16 +177,21 @@ public class RangerMasterKey implements RangerKMSMKI {
 
         XMLUtils.loadConfig(DBKS_SITE_XML, serverConfigProperties);
 
-        defaultMdAlgo  = getConfig("ranger.keystore.file.type", KeyStore.getDefaultType()).equalsIgnoreCase("bcfks") ? "SHA-512" : "MD5";
-        mkCipher       = getConfig("ranger.kms.service.masterkey.password.cipher", DEFAULT_MK_CIPHER);
-        mkKeySize      = getIntConfig("ranger.kms.service.masterkey.password.size", DEFAULT_MK_KeySize);
-        saltSize       = getIntConfig("ranger.kms.service.masterkey.password.salt.size", DEFAULT_SALT_SIZE);
-        salt           = getConfig("ranger.kms.service.masterkey.password.salt", DEFAULT_SALT);
-        pbeAlgo        = getConfig("ranger.kms.service.masterkey.password.encryption.algorithm", DEFAULT_CRYPT_ALGO);
-        mdAlgo         = getConfig("ranger.kms.service.masterkey.password.md.algorithm", defaultMdAlgo);
-        iterationCount = getIntConfig("ranger.kms.service.masterkey.password.iteration.count", DEFAULT_ITERATION_COUNT);
-        paddingString  = Joiner.on(",").skipNulls().join(mkCipher, mkKeySize, saltSize, pbeAlgo, mdAlgo, iterationCount, salt);
+        isFipsEnabled       = getConfig("ranger.keystore.file.type", KeyStore.getDefaultType()).equalsIgnoreCase("bcfks");
+        defaultMdAlgo       = isFipsEnabled ? "SHA-512" : "MD5";
+        defaultCryptAlgo    = isFipsEnabled ? SupportedPBECryptoAlgo.PBKDF2WithHmacSHA256 : defaultCryptAlgo;
+        mkCipher            = getConfig("ranger.kms.service.masterkey.password.cipher", DEFAULT_MK_CIPHER);
+        mkKeySize           = getIntConfig("ranger.kms.service.masterkey.password.size", DEFAULT_MK_KeySize);
+        pbeAlgo             = getConfig("ranger.kms.service.masterkey.password.encryption.algorithm", defaultCryptAlgo.getAlgoName());
+        encrCryptoAlgo      = SupportedPBECryptoAlgo.valueOf(pbeAlgo);
+        saltSize            = calculateCompliantSaltSize(getIntConfig("ranger.kms.service.masterkey.password.salt.size", DEFAULT_SALT_SIZE), encrCryptoAlgo);
+        salt                = getConfig("ranger.kms.service.masterkey.password.salt", DEFAULT_SALT);
+        mdAlgo              = getConfig("ranger.kms.service.masterkey.password.md.algorithm", defaultMdAlgo);
+        iterationCount      = getIntConfig("ranger.kms.service.masterkey.password.iteration.count", DEFAULT_ITERATION_COUNT);
+        paddingString       = Joiner.on(",").skipNulls().join(mkCipher, mkKeySize, saltSize, pbeAlgo, mdAlgo, iterationCount, salt);
 
+        logger.info("Selected DEFAULT_CRYPT_ALGO={}", defaultCryptAlgo);
+        logger.info("MK metadata={}", paddingString);
         logger.debug("<== RangerMasterKey.init()");
     }
 
@@ -193,8 +205,6 @@ public class RangerMasterKey implements RangerKMSMKI {
     public boolean generateMasterKey(String password) throws Throwable {
         logger.debug("==> RangerMasterKey.generateMasterKey()");
         logger.info("Generating Master Key...");
-
-        init();
 
         if (!checkMKExistence(this.masterKeyDao)) {
             logger.info("Master Key doesn't exist in DB, Generating the Master Key");
@@ -249,47 +259,104 @@ public class RangerMasterKey implements RangerKMSMKI {
         }
     }
 
-    public void generateMKFromHSMMK(String password, byte[] key) throws Throwable {
-        logger.debug("==> RangerMasterKey.generateMKFromHSMMK()");
+    private String fetchEncrAlgo(String  encryptedPassString) {
+        String encrAlgo = SupportedPBECryptoAlgo.PBEWithMD5AndTripleDES.getAlgoName();
 
-        init();
-
-        if (!checkMKExistence(this.masterKeyDao)) {
-            logger.info("Master Key doesn't exist in DB, Generating the Master Key");
-
-            String encryptedMasterKey = encryptMasterKey(password, key);
-            String savedKey           = saveEncryptedMK(paddingString + "," + encryptedMasterKey);
-
-            if (savedKey != null && !savedKey.trim().equals("")) {
-                logger.debug("Master Key Created with id = {}", savedKey);
-                logger.debug("<== RangerMasterKey.generateMKFromHSMMK()");
-            }
-        } else {
-            logger.debug("Ranger Master Key already exists in the DB, returning.");
+        String[] mkSplits = null;
+        if (encryptedPassString != null && encryptedPassString.contains(",")) {
+            mkSplits = Lists.newArrayList(Splitter.on(",").split(encryptedPassString)).toArray(new String[0]);
         }
 
-        logger.debug("<== RangerMasterKey.generateMKFromHSMMK()");
+        if (mkSplits != null && mkSplits.length >= PADDING_STRING_ELEM_COUNT) {
+            encrAlgo = mkSplits[3];
+        }
+
+        return encrAlgo;
     }
 
-    public void generateMKFromKeySecureMK(String password, byte[] key) throws Throwable {
-        logger.debug("==> RangerMasterKey.generateMKFromKeySecureMK()");
+    /**
+     * Generate the master key, encrypt it and save it in the database
+     *
+     * @return true if the master key was successfully created false if master
+     * key generation was unsuccessful or the master key already exists
+     */
+    @Override
+    public boolean reencryptMKWithFipsAlgo(String mkPassword) {
+        logger.debug("==> RangerMasterKey.reencryptMKWithFipsAlgorithm");
 
-        init();
+        boolean isMKReencrypted = false;
+        // Fetch MK and check the last CryptoAlgo used for encryption
+        List result = getEncryptedMK();
+        String encryptedPassString = null;
+        byte[] masterKeyByte = null;
+        if (CollectionUtils.isNotEmpty(result) && result.size() == 2) {
+            masterKeyByte = (byte[]) result.get(0);
+            encryptedPassString = (String) result.get(1);
+        } else if (CollectionUtils.isNotEmpty(result)) {
+            masterKeyByte = (byte[]) result.get(0);
+        }
+
+        String currentPbeAlgo = fetchEncrAlgo(encryptedPassString);
+        if (!SupportedPBECryptoAlgo.isFIPSCompliantAlgorithm(SupportedPBECryptoAlgo.valueOf(currentPbeAlgo)) && !RangerMasterKey.encrCryptoAlgo.getAlgoName().equalsIgnoreCase(currentPbeAlgo)) {
+            logger.info("MasterKey key material was encrypted using {} , going to re-encrypt using {}",  currentPbeAlgo, RangerMasterKey.encrCryptoAlgo);
+            byte[] oldKeyMaterial = null;
+            try {
+                // get the old MK key material
+                PBEKeySpec pbeKeyspec = getPBEParameterSpec(mkPassword, SupportedPBECryptoAlgo.valueOf(currentPbeAlgo));
+                oldKeyMaterial = decryptKey(masterKeyByte, pbeKeyspec);
+
+                // re-encrypt it with new encryption algo
+                init();
+                PBEKeySpec newPbeKeySpec = getPBEParameterSpec(mkPassword, encrCryptoAlgo);
+                byte[] masterKeyToDB = encryptKey(oldKeyMaterial, newPbeKeySpec);
+                byte[] decryptedMaterialWithNewAlgo = decryptKey(masterKeyToDB, newPbeKeySpec);
+                // This is just a sanity check but important to ensure that returned key material after re-encryption is same as old MK key material.
+                if (!Base64.encode(oldKeyMaterial).equals(Base64.encode(decryptedMaterialWithNewAlgo))) {
+                    String errMsg = "After re-encryption, Latest decrypted MasterKey material is different than original.Aborting the re-encryption, DB is not updated with new encrypted material.";
+                    logger.error(errMsg);
+                    throw new RuntimeException(errMsg);
+                }
+
+                String encodeMKToDB = Base64.encode(masterKeyToDB);
+                updateEncryptedMK(paddingString + "," + encodeMKToDB);
+                isMKReencrypted = true;
+                logger.info("MasterKey key material got re-encrypted and saved to the DB");
+            } catch (Throwable e) {
+                logger.error(" Error while re-encrypting the  MasterKey", e);
+                throw new RuntimeException(e);
+            }
+        }
+
+        logger.debug("<== RangerMasterKey.reencryptMKWithFipsAlgo");
+
+        return isMKReencrypted;
+    }
+
+    @Override
+    public boolean setExternalKeyAsMK(String password, byte[] key)throws Throwable {
+        logger.debug("==> RangerMasterKey.useExternalKeyAsMK()");
+
+        boolean keySetAsMK = false;
 
         if (!checkMKExistence(this.masterKeyDao)) {
-            logger.info("Master Key doesn't exist in DB, Generating the Master Key");
+            logger.info("Master Key doesn't exist in DB, encrypting and storing the provided Master Key");
 
             String encryptedMasterKey = encryptMasterKey(password, key);
             String savedKey           = saveEncryptedMK(paddingString + "," + encryptedMasterKey);
 
             if (savedKey != null && !savedKey.trim().equals("")) {
-                logger.debug("Master Key Created with id = " + savedKey);
+                keySetAsMK = true;
+                logger.info("Master Key Created with id = {}", savedKey);
+                logger.debug("<== RangerMasterKey.useExternalKeyAsMK()");
             }
         } else {
-            logger.debug("Ranger Master Key already exists in the DB, returning.");
+            String errMsg = "Ranger Master Key already exists in the DB, returning.";
+            logger.warn(errMsg);
         }
 
-        logger.debug("<== RangerMasterKey.generateMKFromKeySecureMK()");
+        logger.debug("<== RangerMasterKey.useExternalKeyAsMK()");
+
+        return keySetAsMK;
     }
 
     private String decryptMasterKey(byte[] masterKey, String password, String encryptedPassString) throws Throwable {
@@ -300,9 +367,9 @@ public class RangerMasterKey implements RangerKMSMKI {
             getPasswordParam(password);
         }
 
-        PBEKeySpec pbeKeyspec               = getPBEParameterSpec(password);
-        byte[]     masterKeyFromDBDecrypted = decryptKey(masterKey, pbeKeyspec);
-        SecretKey  masterKeyFromDB          = getMasterKeyFromBytes(masterKeyFromDBDecrypted);
+        PBEKeySpec pbeKeyspec = getPBEParameterSpec(password, SupportedPBECryptoAlgo.valueOf(pbeAlgo));
+        byte[] masterKeyFromDBDecrypted = decryptKey(masterKey, pbeKeyspec);
+        SecretKey masterKeyFromDB = getMasterKeyFromBytes(masterKeyFromDBDecrypted);
 
         logger.debug("<== RangerMasterKey.decryptMasterKey()");
 
@@ -316,7 +383,7 @@ public class RangerMasterKey implements RangerKMSMKI {
             getPasswordParam(password);
         }
 
-        PBEKeySpec pbeKeyspec               = getPBEParameterSpec(password);
+        PBEKeySpec pbeKeyspec               = getPBEParameterSpec(password, SupportedPBECryptoAlgo.valueOf(pbeAlgo));
         byte[]     masterKeyFromDBDecrypted = decryptKey(masterKey, pbeKeyspec);
 
         logger.debug("<== RangerMasterKey.decryptMasterKeySK()");
@@ -389,6 +456,27 @@ public class RangerMasterKey implements RangerKMSMKI {
         return null;
     }
 
+    private void updateEncryptedMK(String encryptedMasterKey) throws Exception {
+        logger.debug("==> RangerMasterKey.updateEncryptedMK()");
+        try {
+            if (masterKeyDao != null) {
+                XXRangerMasterKey rangerMasterKey = masterKeyDao.getAll().get(0);
+                if (rangerMasterKey != null) {
+                    rangerMasterKey.setMasterKey(encryptedMasterKey);
+                    masterKeyDao.update(rangerMasterKey);
+                }
+
+                logger.debug("<== RangerMasterKey.updateEncryptedMK()");
+            }
+        } catch (Exception e) {
+            String errorMsg = "Error while updating master key in Database!!! ";
+            logger.error(errorMsg, e);
+            throw new Exception("Error while updating master key in Database!!! ", e);
+        }
+
+        logger.debug("<== RangerMasterKey.updateEncryptedMK()");
+    }
+
     /*
         Returns:
         true: if Master Key exists
@@ -407,9 +495,9 @@ public class RangerMasterKey implements RangerKMSMKI {
     private String encryptMasterKey(String password) throws Throwable {
         logger.debug("==> RangerMasterKey.encryptMasterKey()");
 
-        Key        secretKey     = generateMasterKey();
-        PBEKeySpec pbeKeySpec    = getPBEParameterSpec(password);
-        byte[]     masterKeyToDB = encryptKey(secretKey.getEncoded(), pbeKeySpec);
+        Key secretKey = generateMasterKey();
+        PBEKeySpec pbeKeySpec = getPBEParameterSpec(password, encrCryptoAlgo);
+        byte[] masterKeyToDB = encryptKey(secretKey.getEncoded(), pbeKeySpec);
 
         logger.debug("<== RangerMasterKey.encryptMasterKey()");
 
@@ -419,8 +507,8 @@ public class RangerMasterKey implements RangerKMSMKI {
     private String encryptMasterKey(String password, byte[] secretKey) throws Throwable {
         logger.debug("==> RangerMasterKey.encryptMasterKey()");
 
-        PBEKeySpec pbeKeySpec    = getPBEParameterSpec(password);
-        byte[]     masterKeyToDB = encryptKey(secretKey, pbeKeySpec);
+        PBEKeySpec pbeKeySpec = getPBEParameterSpec(password, encrCryptoAlgo);
+        byte[] masterKeyToDB = encryptKey(secretKey, pbeKeySpec);
 
         logger.debug("<== RangerMasterKey.encryptMasterKey()");
 
@@ -437,28 +525,70 @@ public class RangerMasterKey implements RangerKMSMKI {
         return kg.generateKey();
     }
 
-    private PBEKeySpec getPBEParameterSpec(String password) throws Throwable {
+    private PBEKeySpec getPBEParameterSpec(String password, SupportedPBECryptoAlgo encrAlgo) throws Throwable {
         logger.debug("==> RangerMasterKey.getPBEParameterSpec()");
 
-        MessageDigest md      = MessageDigest.getInstance(mdAlgo);
-        byte[]        saltGen = md.digest(salt.getBytes());
-        byte[]        salt    = new byte[saltSize];
+        PBEKeySpec pbeKeySpec;
+        char[] compliantPwd = getCompliantPassword(password, encrAlgo).toCharArray();
 
-        System.arraycopy(saltGen, 0, salt, 0, saltSize);
+        if (SupportedPBECryptoAlgo.isFIPSCompliantAlgorithm(encrAlgo)) {
+            pbeKeySpec = new PBEKeySpec(compliantPwd, generateSalt(saltSize), iterationCount, encrAlgo.getKeyLength());
+        } else {
+            pbeKeySpec = new PBEKeySpec(compliantPwd, generateSalt(saltSize), iterationCount);
+        }
+        return pbeKeySpec;
+    }
 
-        return new PBEKeySpec(password.toCharArray(), salt, iterationCount);
+    /*
+        For FIPS, salt size must be at least 128 bits, that is, at least 16 in length.
+     */
+    private byte[] generateSalt(int saltSize) throws Throwable {
+        MessageDigest md = MessageDigest.getInstance(mdAlgo);
+        byte[] saltGen = md.digest(salt.getBytes());
+        byte[] salt = new byte[saltSize];
+        System.arraycopy(saltGen, 0, salt, 0, RangerMasterKey.saltSize);
+        return salt;
+    }
+
+    /*
+        For FIPS Algo, InApprovedOnlyMode requires password to be at least 112 bits, that is minimum length should be 14
+        If provided password is less than 14, this method appends the same password till it reaches the minimum length of 14.
+        And it is for FIPS only.
+     */
+    private String getCompliantPassword(String password, SupportedPBECryptoAlgo encrAlgo) {
+        String newPwd = password;
+
+        if (encrAlgo.getMinPwdLength().isPresent()) {
+            int requiredPwdLength = encrAlgo.getMinPwdLength().get();
+            while (newPwd.length() < requiredPwdLength) {
+                newPwd = newPwd.concat(password);
+            }
+        }
+
+        return newPwd;
+    }
+
+    // For FIPS, salt size must be at least 128 bits, that is, at least 16 in length.
+    private static int calculateCompliantSaltSize(int saltSize, SupportedPBECryptoAlgo encrAlgo) {
+        int compliantSaltSize = saltSize;
+        if (encrAlgo.getMinSaltSize().isPresent()) {
+            int minSaltSize = encrAlgo.getMinSaltSize().get();
+            while (compliantSaltSize < minSaltSize) {
+                compliantSaltSize = compliantSaltSize * 2;
+            }
+        }
+
+        return compliantSaltSize;
     }
 
     private byte[] encryptKey(byte[] data, PBEKeySpec keyspec) throws Throwable {
         logger.debug("==> RangerMasterKey.encryptKey()");
 
-        SecretKey key = getPasswordKey(keyspec);
+        SecretKey key = getPasswordKey(keyspec, encrCryptoAlgo.getAlgoName());
 
         if (keyspec.getSalt() != null) {
-            PBEParameterSpec paramSpec = new PBEParameterSpec(keyspec.getSalt(), keyspec.getIterationCount());
-            Cipher           c         = Cipher.getInstance(key.getAlgorithm());
-
-            c.init(Cipher.ENCRYPT_MODE, key, paramSpec);
+            Cipher c = Cipher.getInstance(encrCryptoAlgo.getCipherTransformation());
+            c.init(Cipher.ENCRYPT_MODE, key, encrCryptoAlgo.getAlgoParamSpec(keyspec));
 
             logger.debug("<== RangerMasterKey.encryptKey()");
 
@@ -470,10 +600,10 @@ public class RangerMasterKey implements RangerKMSMKI {
         return null;
     }
 
-    private SecretKey getPasswordKey(PBEKeySpec keyspec) throws Throwable {
+    private SecretKey getPasswordKey(PBEKeySpec keyspec, String cryptoAlgo) throws Throwable {
         logger.debug("==> RangerMasterKey.getPasswordKey()");
 
-        SecretKeyFactory factory = SecretKeyFactory.getInstance(pbeAlgo);
+        SecretKeyFactory factory = SecretKeyFactory.getInstance(cryptoAlgo);
 
         logger.debug("<== RangerMasterKey.getPasswordKey()");
 
@@ -481,14 +611,11 @@ public class RangerMasterKey implements RangerKMSMKI {
     }
 
     private byte[] decryptKey(byte[] encrypted, PBEKeySpec keySpec) throws Throwable {
-        SecretKey key = getPasswordKey(keySpec);
-
+        SecretKey key = getPasswordKey(keySpec, pbeAlgo);
         if (keySpec.getSalt() != null) {
-            PBEParameterSpec paramSpec = new PBEParameterSpec(keySpec.getSalt(), keySpec.getIterationCount());
-            Cipher           c         = Cipher.getInstance(key.getAlgorithm());
-
-            c.init(Cipher.DECRYPT_MODE, key, paramSpec);
-
+            AlgorithmParameterSpec algoParamSpec =  SupportedPBECryptoAlgo.valueOf(pbeAlgo).getAlgoParamSpec(keySpec);
+            Cipher c = Cipher.getInstance(SupportedPBECryptoAlgo.valueOf(pbeAlgo).getCipherTransformation());
+            c.init(Cipher.DECRYPT_MODE, key, algoParamSpec);
             return c.doFinal(encrypted);
         }
 
@@ -497,5 +624,34 @@ public class RangerMasterKey implements RangerKMSMKI {
 
     private SecretKey getMasterKeyFromBytes(byte[] keyData) {
         return new SecretKeySpec(keyData, mkCipher);
+    }
+
+    // Following methods MUST NOT BE USED FOR PROD CODE. IT HAS BEEN EXPOSED ONLY FOR UnitTesting.
+
+    @VisibleForTesting
+    SupportedPBECryptoAlgo getDefaultCryptoAlgorithm() {
+        return defaultCryptAlgo;
+    }
+
+    @VisibleForTesting
+    SupportedPBECryptoAlgo getSelectedCryptoAlgorithm() {
+        return encrCryptoAlgo;
+    }
+
+    @VisibleForTesting
+    SupportedPBECryptoAlgo getMKEncryptionAlgoName() {
+        List result = getEncryptedMK();
+        String encryptedPassString = null;
+        if (CollectionUtils.isNotEmpty(result) && result.size() == 2) {
+            encryptedPassString = (String) result.get(1);
+        }
+
+        return  SupportedPBECryptoAlgo.valueOf(fetchEncrAlgo(encryptedPassString));
+    }
+
+    @VisibleForTesting
+    void resetDefaultMDAlgoAndEncrAlgo() {
+        defaultMdAlgo = "MD5";
+        defaultCryptAlgo = SupportedPBECryptoAlgo.PBEWithMD5AndTripleDES;
     }
 }

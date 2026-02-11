@@ -23,9 +23,9 @@ import { Form, Field } from "react-final-form";
 import { toast } from "react-toastify";
 import arrayMutators from "final-form-arrays";
 import { FieldArray } from "react-final-form-arrays";
-import Select from "react-select";
 import AsyncSelect from "react-select/async";
-import { RegexValidation } from "Utils/XAEnums";
+import AsyncCreatableSelect from "react-select/async-creatable";
+import { RegexValidation, additionalServiceConfigs } from "Utils/XAEnums";
 import { fetchApi } from "Utils/fetchAPI";
 import ServiceAuditFilter from "./ServiceAuditFilter";
 import TestConnection from "./TestConnection";
@@ -34,14 +34,16 @@ import {
   navigateTo,
   serverError,
   updateTagActive
-} from "../../utils/XAUtils";
+} from "Utils/XAUtils";
 import {
   BlockUi,
   Condition,
   CustomPopover,
   Loader,
-  scrollToError
-} from "../../components/CommonComponents";
+  scrollToError,
+  selectInputCustomStyles,
+  trimInputValue
+} from "Components/CommonComponents";
 import {
   difference,
   flatMap,
@@ -57,12 +59,14 @@ import {
   split,
   without,
   maxBy,
-  isArray,
-  cloneDeep
+  cloneDeep,
+  intersection,
+  join,
+  sortBy
 } from "lodash";
 import withRouter from "Hooks/withRouter";
-import { RangerPolicyType } from "../../utils/XAEnums";
-import { getServiceDef } from "../../utils/appState";
+import { RangerPolicyType } from "Utils/XAEnums";
+import { getServiceDef } from "Utils/appState";
 
 class ServiceForm extends Component {
   constructor(props) {
@@ -78,13 +82,15 @@ class ServiceForm extends Component {
     this.state = {
       serviceDef: {},
       service: {},
-      tagService: [],
       editInitialValues: {},
       showDelete: false,
       loader: true,
       blockUI: false,
       defaultTagOptions: [],
-      loadingOptions: false
+      loadingOptions: false,
+      defaultAdditionalUserConfigOptions: [],
+      defaultAdditionalGroupConfigOptions: [],
+      loadingAdditionalConfigOptions: false
     };
   }
 
@@ -185,6 +191,15 @@ class ServiceForm extends Component {
         if (config === this.configsJson[jsonConfig]) {
           serviceJson["configs"][jsonConfig] = values?.configs[config];
         }
+      }
+    }
+
+    for (const config of additionalServiceConfigs) {
+      if (config.name in serviceJson["configs"]) {
+        serviceJson["configs"][config.name] = join(
+          map(serviceJson["configs"][config.name], "value"),
+          ","
+        );
       }
     }
 
@@ -372,8 +387,8 @@ class ServiceForm extends Component {
 
     const serviceJson = {};
     serviceJson["name"] = serviceResp?.data?.name;
-    serviceJson["displayName"] = serviceResp?.data?.displayName;
-    serviceJson["description"] = serviceResp?.data?.description;
+    serviceJson["displayName"] = serviceResp?.data?.displayName?.trim();
+    serviceJson["description"] = serviceResp?.data?.description?.trim();
     serviceJson["isEnabled"] = JSON.stringify(serviceResp?.data?.isEnabled);
 
     serviceJson["tagService"] =
@@ -394,12 +409,39 @@ class ServiceForm extends Component {
 
     serviceDefConfigs.map((config) => {
       serviceJson["configs"][config.replaceAll(".", "_").replaceAll("-", "_")] =
-        serviceResp?.data?.configs?.[config];
+        serviceResp?.data?.configs?.[config]?.trim();
     });
 
-    let editCustomConfigs = serviceCustomConfigs.map((config) => {
-      return { name: config, value: serviceResp?.data?.configs[config] };
+    const additionalConfigs = intersection(
+      serviceCustomConfigs,
+      map(additionalServiceConfigs, "name")
+    );
+
+    const editAdditionalConfigs = additionalConfigs.map((config) => {
+      return {
+        name: config,
+        value: map(split(serviceResp?.data?.configs[config], ","), (val) => ({
+          label: val,
+          value: val
+        }))
+      };
     });
+
+    editAdditionalConfigs.map((config) => {
+      serviceJson["configs"][
+        config.name.replaceAll(".", "_").replaceAll("-", "_")
+      ] = config.value;
+    });
+
+    let editCustomConfigs = sortBy(
+      difference(serviceCustomConfigs, additionalConfigs)?.map((config) => {
+        return {
+          name: config?.trim(),
+          value: serviceResp?.data?.configs[config]?.trim()
+        };
+      }),
+      "name"
+    );
 
     serviceJson["customConfigs"] =
       editCustomConfigs.length == 0 ? [undefined] : editCustomConfigs;
@@ -453,6 +495,26 @@ class ServiceForm extends Component {
       this.setState({ defaultTagOptions: opts, loadingOptions: false });
     });
   };
+
+  onFocusAdditionalConfigOptions = (type) => {
+    this.setState({ loadingAdditionalConfigOptions: true });
+    if (type === "user") {
+      this.fetchUsers().then((opts) => {
+        this.setState({
+          defaultAdditionalUserConfigOptions: opts,
+          loadingAdditionalConfigOptions: false
+        });
+      });
+    } else {
+      this.fetchGroups().then((opts) => {
+        this.setState({
+          defaultAdditionalGroupConfigOptions: opts,
+          loadingAdditionalConfigOptions: false
+        });
+      });
+    }
+  };
+
   deleteService = async (serviceId) => {
     this.hideDeleteModal();
     try {
@@ -595,6 +657,65 @@ class ServiceForm extends Component {
     return [];
   };
 
+  getAdditionalServiceConfigs = () => {
+    const additionalServiceConfigsFormFields = additionalServiceConfigs.map(
+      (additionalConfig, index) => {
+        this.configsJson[additionalConfig.name] = additionalConfig.name
+          .replaceAll(".", "_")
+          .replaceAll("-", "_");
+        return (
+          <Row
+            className="form-group"
+            key={this.configsJson[additionalConfig.name]}
+          >
+            <Col xs={3}>
+              <label className="form-label float-end">
+                {additionalConfig.label}
+              </label>
+            </Col>
+            <Col xs={4}>
+              <Field
+                name={"configs." + this.configsJson[additionalConfig.name]}
+                key={"configs." + additionalConfig.name + index}
+                id={"configs." + additionalConfig.name}
+                data-cy={"configs." + additionalConfig.name}
+                component={this.AsyncCreatableSelectField}
+                loadOptions={
+                  additionalConfig.type == "user"
+                    ? this.fetchUsers
+                    : this.fetchGroups
+                }
+                onFocus={() => {
+                  this.onFocusAdditionalConfigOptions(additionalConfig.type);
+                }}
+                defaultOptions={
+                  additionalConfig.type == "user"
+                    ? this.state.defaultAdditionalUserConfigOptions
+                    : this.state.defaultAdditionalGroupConfigOptions
+                }
+                placeholder={
+                  additionalConfig.type == "user"
+                    ? "Select Users"
+                    : "Select Groups"
+                }
+                noOptionsMessage={() =>
+                  this.state.loadingAdditionalConfigOptions
+                    ? "Loading..."
+                    : "No options"
+                }
+                isClearable={true}
+                styles={selectInputCustomStyles}
+                isMulti
+              />
+            </Col>
+          </Row>
+        );
+      }
+    );
+
+    return additionalServiceConfigsFormFields;
+  };
+
   getServiceConfigs = (serviceDef) => {
     if (serviceDef?.configs !== undefined) {
       let formField = [];
@@ -644,6 +765,7 @@ class ServiceForm extends Component {
                         data-cy={
                           "configs." + this.configsJson[configParam.name]
                         }
+                        onBlur={(e) => trimInputValue(e, input)}
                       />
                     </Col>
                     {configInfo.length === 1 && (
@@ -854,8 +976,8 @@ class ServiceForm extends Component {
       : undefined;
 
   validateDisplayName = (value) =>
-    !RegexValidation.NAME_VALIDATION.regexforNameValidation.test(value)
-      ? RegexValidation.NAME_VALIDATION.regexforNameValidationMessage
+    !RegexValidation.NAME_VALIDATION.regexForNameValidation.test(value)
+      ? RegexValidation.NAME_VALIDATION.regexForNameValidationMessage
       : undefined;
 
   composeValidators =
@@ -866,12 +988,12 @@ class ServiceForm extends Component {
         undefined
       );
 
-  SelectField = ({ input, ...rest }) => (
-    <Select {...input} {...rest} searchable />
+  AsyncSelectField = ({ input, ...rest }) => (
+    <AsyncSelect {...input} {...rest} cacheOptions tabSelectsValue={false} />
   );
 
-  AsyncSelectField = ({ input, ...rest }) => (
-    <AsyncSelect {...input} {...rest} cacheOptions />
+  AsyncCreatableSelectField = ({ input, ...rest }) => (
+    <AsyncCreatableSelect {...input} {...rest} tabSelectsValue={false} />
   );
 
   fetchUsers = async (inputValue) => {
@@ -918,16 +1040,16 @@ class ServiceForm extends Component {
 
     try {
       const roleResp = await fetchApi({
-        url: "roles/roles",
+        url: "roles/lookup/roles/names",
         params: params
       });
-      op = roleResp.data?.roles;
+      op = roleResp.data?.vXStrings;
     } catch (error) {
       console.error(`Error occurred while fetching Roles ! ${error}`);
     }
 
     return map(op, function (obj) {
-      return { label: obj.name, value: obj.name };
+      return { label: obj.value, value: obj.value };
     });
   };
   ServiceDefnBreadcrumb = () => {
@@ -1087,6 +1209,7 @@ class ServiceForm extends Component {
                                         : "form-control"
                                     }
                                     data-cy="displayName"
+                                    onBlur={(e) => trimInputValue(e, input)}
                                   />
                                 </Col>
                                 {meta.error && meta.touched && (
@@ -1114,6 +1237,7 @@ class ServiceForm extends Component {
                                         : "form-control"
                                     }
                                     data-cy="description"
+                                    onBlur={(e) => trimInputValue(e, input)}
                                   />
                                 </Col>
                                 {meta.error && meta.touched && (
@@ -1162,7 +1286,7 @@ class ServiceForm extends Component {
                             <Row className="form-group">
                               <Col xs={3}>
                                 <label className="form-label float-end">
-                                  Select Tag Service
+                                  Tag Service
                                 </label>
                               </Col>
                               <Col xs={4}>
@@ -1178,6 +1302,7 @@ class ServiceForm extends Component {
                                   isLoading={this.state.loadingOptions}
                                   isClearable={true}
                                   cacheOptions
+                                  styles={selectInputCustomStyles}
                                 />
                               </Col>
                             </Row>
@@ -1188,10 +1313,11 @@ class ServiceForm extends Component {
                         <Col xs={12}>
                           <p className="form-header">Config Properties :</p>
                           {this.getServiceConfigs(this.state.serviceDef)}
+                          {this.getAdditionalServiceConfigs()}
                           <Row className="form-group">
                             <Col xs={3}>
                               <label className="form-label float-end">
-                                Add New Configurations
+                                Add New Custom Configurations
                               </label>
                             </Col>
                             <Col xs={5}>
@@ -1210,22 +1336,34 @@ class ServiceForm extends Component {
                                       fields.map((name, index) => (
                                         <tr key={name}>
                                           <td className="text-center">
-                                            <Field
-                                              name={`${name}.name`}
-                                              component="input"
-                                              className="form-control"
-                                              data-js="name"
-                                              data-cy="name"
-                                            />
+                                            <Field name={`${name}.name`}>
+                                              {({ input }) => (
+                                                <input
+                                                  {...input}
+                                                  className="form-control"
+                                                  data-js="name"
+                                                  data-cy="name"
+                                                  onBlur={(e) =>
+                                                    trimInputValue(e, input)
+                                                  }
+                                                />
+                                              )}
+                                            </Field>
                                           </td>
                                           <td className="text-center">
-                                            <Field
-                                              name={`${name}.value`}
-                                              component="input"
-                                              className="form-control"
-                                              data-js="value"
-                                              data-cy="value"
-                                            />
+                                            <Field name={`${name}.value`}>
+                                              {({ input }) => (
+                                                <input
+                                                  {...input}
+                                                  className="form-control"
+                                                  data-js="value"
+                                                  data-cy="value"
+                                                  onBlur={(e) =>
+                                                    trimInputValue(e, input)
+                                                  }
+                                                />
+                                              )}
+                                            </Field>
                                           </td>
                                           <td className="text-center">
                                             <Button
@@ -1258,8 +1396,8 @@ class ServiceForm extends Component {
                                 onClick={() =>
                                   addItem("customConfigs", undefined)
                                 }
-                                data-action="addGroup"
-                                data-cy="addGroup"
+                                data-action="addCustomConfigs"
+                                data-cy="addCustomConfigs"
                               >
                                 <i className="fa-fw fa fa-plus"></i>
                               </Button>

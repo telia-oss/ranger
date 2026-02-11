@@ -20,9 +20,9 @@
 package org.apache.ranger.common;
 
 import org.apache.commons.collections.MapUtils;
-import org.apache.commons.lang.ArrayUtils;
-import org.apache.commons.lang.StringUtils;
-import org.apache.commons.lang.Validate;
+import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.Validate;
 import org.apache.ranger.plugin.util.SearchFilter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -105,6 +105,7 @@ public class RangerSearchUtil extends SearchUtil {
         ret.setParam(SearchFilter.TAG_SOURCE_PARTIAL, request.getParameter(SearchFilter.TAG_SOURCE_PARTIAL));
         ret.setParam(SearchFilter.TAG_SERVICE_NAME, request.getParameter(SearchFilter.TAG_SERVICE_NAME));
         ret.setParam(SearchFilter.TAG_SERVICE_NAME_PARTIAL, request.getParameter(SearchFilter.TAG_SERVICE_NAME_PARTIAL));
+        ret.setParam(SearchFilter.TAG_RESOURCE_ID, request.getParameter(SearchFilter.TAG_RESOURCE_ID));
         ret.setParam(SearchFilter.TAG_RESOURCE_GUID, request.getParameter(SearchFilter.TAG_RESOURCE_GUID));
         ret.setParam(SearchFilter.TAG_RESOURCE_SIGNATURE, request.getParameter(SearchFilter.TAG_RESOURCE_SIGNATURE));
         ret.setParam(SearchFilter.TAG_RESOURCE_ELEMENTS, request.getParameter(SearchFilter.TAG_RESOURCE_ELEMENTS));
@@ -113,6 +114,7 @@ public class RangerSearchUtil extends SearchUtil {
         ret.setParam(SearchFilter.TAG_ID, request.getParameter(SearchFilter.TAG_ID));
         ret.setParam(SearchFilter.CREATED_BY, request.getParameter(SearchFilter.CREATED_BY));
         ret.setParam(SearchFilter.APPROVER, request.getParameter(SearchFilter.APPROVER));
+        ret.setParam(SearchFilter.POLICY_NAME_PREFIX, request.getParameter(SearchFilter.POLICY_NAME_PREFIX));
         ret.setParam(SearchFilter.SHARE_STATUS, request.getParameter(SearchFilter.SHARE_STATUS));
 
         for (Map.Entry<String, String[]> e : request.getParameterMap().entrySet()) {
@@ -150,6 +152,11 @@ public class RangerSearchUtil extends SearchUtil {
         ret.setParam(SearchFilter.UPDATE_TIME_END, request.getParameter(SearchFilter.UPDATE_TIME_END));
         ret.setParam(SearchFilter.RESOURCE_CONTAINS, request.getParameter(SearchFilter.RESOURCE_CONTAINS));
         ret.setParam(SearchFilter.SHARED_WITH_ME, request.getParameter(SearchFilter.SHARED_WITH_ME));
+        ret.setParam(SearchFilter.VALIDITY_EXPIRY_START, request.getParameter(SearchFilter.VALIDITY_EXPIRY_START));
+        ret.setParam(SearchFilter.VALIDITY_EXPIRY_END, request.getParameter(SearchFilter.VALIDITY_EXPIRY_END));
+        ret.setParam(SearchFilter.VALIDITY_TIME_ZONE, request.getParameter(SearchFilter.VALIDITY_TIME_ZONE));
+        ret.setParam(SearchFilter.DATASET_LABEL_MATCH_TYPE, request.getParameter(SearchFilter.DATASET_LABEL_MATCH_TYPE));
+        ret.setParam(SearchFilter.DATASET_KEYWORD_MATCH_TYPE, request.getParameter(SearchFilter.DATASET_KEYWORD_MATCH_TYPE));
 
         extractCommonCriteriasForFilter(request, ret, sortFields);
 

@@ -19,7 +19,7 @@
 
 package org.apache.ranger.tagsync.process;
 
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.SecureClientLogin;
 import org.apache.ranger.credentialapi.CredentialReader;
@@ -80,6 +80,7 @@ public class TagSyncConfig extends Configuration {
     private static final long DEFAULT_TAGSYNC_ATLASREST_SOURCE_DOWNLOAD_INTERVAL   = 900000;
     private static final long DEFAULT_TAGSYNC_FILESOURCE_MOD_TIME_CHECK_INTERVAL   = 60000;
     private static final long DEFAULT_TAGSYNC_SOURCE_RETRY_INITIALIZATION_INTERVAL = 10000;
+    private static final long DEFAULT_TAGSYNC_HA_PASSIVE_SLEEP_INTERVAL            = 5000;
     private static final String AUTH_TYPE                 = "hadoop.security.authentication";
     private static final String NAME_RULES                = "hadoop.security.auth_to_local";
     private static final String TAGSYNC_KERBEROS_PRICIPAL = "ranger.tagsync.kerberos.principal";
@@ -192,6 +193,10 @@ public class TagSyncConfig extends Configuration {
 
     public static synchronized boolean isTagSyncServiceActive() {
         return TagSyncHAInitializerImpl.getInstance(TagSyncConfig.getInstance()).isActive();
+    }
+
+    public static long getTagSyncHAPassiveSleepInterval() {
+        return DEFAULT_TAGSYNC_HA_PASSIVE_SLEEP_INTERVAL;
     }
 
     public static String getTagsyncKeyStoreType(Properties prop) {

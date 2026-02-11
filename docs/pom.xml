@@ -97,6 +97,7 @@
             <email>abhi@apache.org</email>
             <timezone>-8</timezone>
             <roles>
+				<role>PMC</role>
                 <role>Committer</role>
             </roles>
             <organization>
@@ -523,6 +524,18 @@
             </roles>
             <organization>
                 Tset
+            </organization>
+        </developer>
+        <developer>
+            <id>vikaskumar</id>
+            <name>Vikas Kumar</name>
+            <email>vikaskumar@apache.org</email>
+            <timezone>Asia/Kolkata</timezone>
+            <roles>
+                <role>Committer</role>
+            </roles>
+            <organization>
+                Cloudera
             </organization>
         </developer>
     </developers>

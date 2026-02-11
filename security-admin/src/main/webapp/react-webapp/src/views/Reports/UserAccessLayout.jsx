@@ -47,12 +47,11 @@ import {
 } from "lodash";
 import { toast } from "react-toastify";
 import { fetchApi } from "Utils/fetchAPI";
-import { useQuery } from "../../components/CommonComponents";
+import { useQuery, selectInputCustomStyles } from "Components/CommonComponents";
 import SearchPolicyTable from "./SearchPolicyTable";
-import { isAuditor, isKeyAdmin, isKMSAuditor } from "../../utils/XAUtils";
-import CustomBreadcrumb from "../CustomBreadcrumb";
+import { isAuditor, isKeyAdmin, isKMSAuditor } from "Utils/XAUtils";
 import moment from "moment-timezone";
-import { getServiceDef } from "../../utils/appState";
+import { getServiceDef } from "Utils/appState";
 
 function UserAccessLayout() {
   const isKMSRole = isKeyAdmin() || isKMSAuditor();
@@ -94,10 +93,10 @@ function UserAccessLayout() {
 
     try {
       servicesResp = await fetchApi({
-        url: "plugins/services"
+        url: "public/v2/api/service-headers"
       });
 
-      resourceServices = filter(servicesResp.data.services, (service) =>
+      resourceServices = filter(servicesResp?.data, (service) =>
         isKMSRole ? service.type == "kms" : service.type != "kms"
       );
     } catch (error) {
@@ -480,7 +479,6 @@ function UserAccessLayout() {
       <div className="clearfix">
         <div className="header-wraper">
           <h3 className="wrap-header bold">Reports</h3>
-          <CustomBreadcrumb />
         </div>
       </div>
       <div className="wrap report-page">
@@ -540,6 +538,7 @@ function UserAccessLayout() {
                                   ]}
                                   menuPlacement="auto"
                                   placeholder="Select Policy Type"
+                                  tabSelectsValue={false}
                                 />
                               )}
                             </Field>
@@ -557,8 +556,10 @@ function UserAccessLayout() {
                                   isMulti
                                   isClearable={false}
                                   options={serviceDefOpts}
-                                  placeholder="Select Component Type"
                                   menuPlacement="auto"
+                                  placeholder="Select Component Type"
+                                  styles={selectInputCustomStyles}
+                                  tabSelectsValue={false}
                                 />
                               )}
                             </Field>
@@ -596,6 +597,8 @@ function UserAccessLayout() {
                                   isClearable={true}
                                   loadOptions={fetchPolicyLabels}
                                   placeholder="Select Policy Label"
+                                  styles={selectInputCustomStyles}
+                                  tabSelectsValue={false}
                                 />
                               )}
                             </Field>
@@ -616,6 +619,8 @@ function UserAccessLayout() {
                                       options={zoneNameOpts}
                                       menuPlacement="auto"
                                       placeholder="Select Zone Name"
+                                      styles={selectInputCustomStyles}
+                                      tabSelectsValue={false}
                                     />
                                   )}
                                 </Field>
@@ -653,6 +658,7 @@ function UserAccessLayout() {
                                     onChange={(e) =>
                                       onChangeSearchBy(e, input, values)
                                     }
+                                    tabSelectsValue={false}
                                   />
                                 )}
                               </Field>
@@ -773,15 +779,15 @@ function SearchByAsyncSelect(props) {
     let optsList = [];
     let serverResp = [];
 
-    if (inputValue) {
-      params["name"] = inputValue || "";
-    }
     if (searchByOptName.value == "searchByGroup") {
       apiUrl = "xusers/lookup/groups";
+      params["name"] = inputValue || "";
     } else if (searchByOptName.value == "searchByUser") {
       apiUrl = "xusers/lookup/users";
+      params["name"] = inputValue || "";
     } else if (searchByOptName.value == "searchByRole") {
-      apiUrl = "roles/roles";
+      apiUrl = "roles/lookup/roles/names";
+      params["roleNamePartial"] = inputValue || "";
     }
     if (!isEmpty(apiUrl)) {
       serverResp = await fetchApi({
@@ -789,23 +795,10 @@ function SearchByAsyncSelect(props) {
         params: params
       });
     }
-
-    if (searchByOptName.value == "searchByUser") {
-      optsList = serverResp.data.vXStrings.map((obj) => ({
-        label: obj["value"],
-        value: obj["value"]
-      }));
-    } else if (searchByOptName.value == "searchByRole") {
-      optsList = serverResp.data.roles.map(({ name }) => ({
-        label: name,
-        value: name
-      }));
-    } else {
-      optsList = serverResp.data.vXStrings.map((obj) => ({
-        label: obj["value"],
-        value: obj["value"]
-      }));
-    }
+    optsList = serverResp?.data?.vXStrings.map((obj) => ({
+      label: obj["value"],
+      value: obj["value"]
+    }));
 
     return optsList;
   };
@@ -826,6 +819,7 @@ function SearchByAsyncSelect(props) {
             DropdownIndicator: () => null,
             IndicatorSeparator: () => null
           }}
+          tabSelectsValue={false}
         />
       )}
     </Field>

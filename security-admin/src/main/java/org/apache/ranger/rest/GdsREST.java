@@ -20,8 +20,8 @@
 package org.apache.ranger.rest;
 
 import org.apache.commons.collections4.CollectionUtils;
-import org.apache.commons.lang.ArrayUtils;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
 import org.apache.ranger.authorization.hadoop.config.RangerAdminConfig;
 import org.apache.ranger.biz.AssetMgr;
@@ -36,6 +36,7 @@ import org.apache.ranger.plugin.model.RangerGds;
 import org.apache.ranger.plugin.model.RangerGds.DataShareInDatasetSummary;
 import org.apache.ranger.plugin.model.RangerGds.DataShareSummary;
 import org.apache.ranger.plugin.model.RangerGds.DatasetSummary;
+import org.apache.ranger.plugin.model.RangerGds.DatasetsSummary;
 import org.apache.ranger.plugin.model.RangerGds.RangerDataShare;
 import org.apache.ranger.plugin.model.RangerGds.RangerDataShareInDataset;
 import org.apache.ranger.plugin.model.RangerGds.RangerDataset;
@@ -392,8 +393,7 @@ public class GdsREST {
 
             filter = searchUtil.getSearchFilter(request, datasetService.sortFields);
 
-            searchUtil.extractStringList(request, filter, SearchFilter.DATASET_LABEL, "Dataset Label List", "datasetLabels", null, null);
-            searchUtil.extractStringList(request, filter, SearchFilter.DATASET_KEYWORD, "Dataset Keyword List", "datasetKeywords", null, null);
+            extractDatasetMultiValueParams(request, filter);
 
             ret = gdsStore.searchDatasets(filter);
         } catch (WebApplicationException excp) {
@@ -449,13 +449,15 @@ public class GdsREST {
         LOG.debug("==> GdsREST.getDatasetSummary()");
 
         PList<DatasetSummary> ret;
-        RangerPerfTracer      perf   = RangerPerfTracer.getPerfTracer(PERF_LOG, "GdsREST.getDatasetSummary()");
-        SearchFilter          filter = null;
+        RangerPerfTracer perf   = RangerPerfTracer.getPerfTracer(PERF_LOG, "GdsREST.getDatasetSummary()");
+        SearchFilter     filter = null;
 
         try {
             filter = searchUtil.getSearchFilter(request, datasetService.sortFields);
 
-            ret = gdsStore.getDatasetSummary(filter);
+            extractDatasetMultiValueParams(request, filter);
+
+            ret    = gdsStore.getDatasetSummary(filter);
         } catch (WebApplicationException we) {
             throw we;
         } catch (Throwable ex) {
@@ -466,7 +468,39 @@ public class GdsREST {
             RangerPerfTracer.log(perf);
         }
 
-        LOG.debug("<== GdsREST.getDatasetSummary(): {}", ret);
+        LOG.debug("<== GdsREST.getDatasetSummary()");
+
+        return ret;
+    }
+
+    @GET
+    @Path("/dataset/enhancedsummary")
+    @Produces("application/json")
+    @PreAuthorize("@rangerPreAuthSecurityHandler.isAPIAccessible(\"" + RangerAPIList.GET_DATASET_SUMMARY + "\")")
+    public DatasetsSummary getEnhancedDatasetSummary(@Context HttpServletRequest request) {
+        LOG.debug("==> GdsREST.getEnhancedDatasetSummary()");
+
+        DatasetsSummary ret;
+        RangerPerfTracer perf   = RangerPerfTracer.getPerfTracer(PERF_LOG, "GdsREST.getEnhancedDatasetSummary()");
+        SearchFilter     filter = null;
+
+        try {
+            filter = searchUtil.getSearchFilter(request, datasetService.sortFields);
+
+            extractDatasetMultiValueParams(request, filter);
+
+            ret    = gdsStore.getEnhancedDatasetSummary(filter);
+        } catch (WebApplicationException we) {
+            throw we;
+        } catch (Throwable ex) {
+            LOG.error("getEnhancedDatasetSummary({}) failed", filter, ex);
+
+            throw restErrorUtil.createRESTException(ex.getMessage());
+        } finally {
+            RangerPerfTracer.log(perf);
+        }
+
+        LOG.debug("<== GdsREST.getEnhancedDatasetSummary()");
 
         return ret;
     }
@@ -1900,29 +1934,29 @@ public class GdsREST {
             return null;
         }
 
-        List<RangerGrant> ret = new ArrayList<>();
+        List<RangerGrant>   ret         = new ArrayList<>();
 
         for (RangerPolicyItem policyItem : policyItems) {
             List<String> policyItemUsers  = policyItem.getUsers();
             List<String> policyItemGroups = policyItem.getGroups();
             List<String> policyItemRoles  = policyItem.getRoles();
 
-            List<RangerPolicyItemAccess>    policyItemAccesses   = policyItem.getAccesses();
-            List<RangerPolicyItemCondition> policyItemConditions = policyItem.getConditions();
+            List<RangerPolicyItemAccess>    policyItemAccesses    = policyItem.getAccesses();
+            List<RangerPolicyItemCondition> policyItemConditions  = policyItem.getConditions();
+            List<String>                    policyItemAccessTypes = policyItemAccesses.stream().map(RangerPolicyItemAccess::getType).collect(Collectors.toList());
 
-            List<String> policyItemAccessTypes     = policyItemAccesses.stream().map(RangerPolicyItemAccess::getType).collect(Collectors.toList());
-            List<String> policyItemConditionValues = policyItemConditions.stream().flatMap(x -> x.getValues().stream()).collect(Collectors.toList());
+            List<RangerGrant.Condition> conditions = getGrantConditions(policyItemConditions);
 
             if (CollectionUtils.isNotEmpty(policyItemUsers)) {
-                policyItemUsers.forEach(x -> ret.add(new RangerGrant(new RangerPrincipal(RangerPrincipal.PrincipalType.USER, x), policyItemAccessTypes, policyItemConditionValues)));
+                policyItemUsers.forEach(x -> ret.add(new RangerGrant(new RangerPrincipal(PrincipalType.USER, x), policyItemAccessTypes, conditions)));
             }
 
             if (CollectionUtils.isNotEmpty(policyItemGroups)) {
-                policyItemGroups.forEach(x -> ret.add(new RangerGrant(new RangerPrincipal(RangerPrincipal.PrincipalType.GROUP, x), policyItemAccessTypes, policyItemConditionValues)));
+                policyItemGroups.forEach(x -> ret.add(new RangerGrant(new RangerPrincipal(PrincipalType.GROUP, x), policyItemAccessTypes, conditions)));
             }
 
             if (CollectionUtils.isNotEmpty(policyItemRoles)) {
-                policyItemRoles.forEach(x -> ret.add(new RangerGrant(new RangerPrincipal(RangerPrincipal.PrincipalType.ROLE, x), policyItemAccessTypes, policyItemConditionValues)));
+                policyItemRoles.forEach(x -> ret.add(new RangerGrant(new RangerPrincipal(PrincipalType.ROLE, x), policyItemAccessTypes, conditions)));
             }
         }
 
@@ -1974,6 +2008,16 @@ public class GdsREST {
         return policy;
     }
 
+    private List<RangerGrant.Condition> getGrantConditions(List<RangerPolicy.RangerPolicyItemCondition> policyItemConditions) {
+        List<RangerGrant.Condition> ret = new ArrayList<>();
+
+        if (CollectionUtils.isNotEmpty(policyItemConditions)) {
+            policyItemConditions.stream().map(condition -> new RangerGrant.Condition(condition.getType(), condition.getValues())).forEach(ret::add);
+        }
+
+        return ret;
+    }
+
     private Long getOrCreateDataShare(Long datasetId, Long serviceId, Long zoneId, String serviceName) throws Exception {
         LOG.debug("==> GdsREST.getOrCreateDataShare(dataSetId={} serviceId={} zoneId={} serviceName={})", datasetId, serviceId, zoneId, serviceName);
 
@@ -2012,7 +2056,7 @@ public class GdsREST {
 
             rangerDataShareInDataset.setDataShareId(rangerDataShare.getId());
             rangerDataShareInDataset.setDatasetId(rangerDataset.getId());
-            rangerDataShareInDataset.setStatus(RangerGds.GdsShareStatus.REQUESTED);
+            rangerDataShareInDataset.setStatus(RangerGds.GdsShareStatus.ACTIVE);
             rangerDataShareInDatasets.add(rangerDataShareInDataset);
 
             addDataSharesInDataset(rangerDataset.getId(), rangerDataShareInDatasets);
@@ -2125,17 +2169,22 @@ public class GdsREST {
             return null;
         }
 
-        RangerPolicyItem policyItem  = new RangerPolicyItem();
-        List<String>     permissions = grant.getAccessTypes();
-        List<String>     conditions  = grant.getConditions();
+        RangerPolicyItem            policyItem  = new RangerPolicyItem();
+        List<String>                permissions = grant.getAccessTypes();
+        List<RangerGrant.Condition> conditions  = grant.getConditions();
 
         if (CollectionUtils.isNotEmpty(permissions)) {
-            policyItem.setAccesses(permissions.stream().map(accessType -> new RangerPolicyItemAccess(accessType, true)).collect(Collectors.toList()));
+            policyItem.setAccesses(permissions.stream()
+                    .map(accessType -> new RangerPolicyItemAccess(accessType, true))
+                    .collect(Collectors.toList()));
         }
 
+        List<RangerPolicyItemCondition> policyItemConditions = new ArrayList<>();
         if (CollectionUtils.isNotEmpty(conditions)) {
-            policyItem.setConditions(conditions.stream().map(condition -> new RangerPolicyItemCondition(GDS_POLICY_EXPR_CONDITION, Collections.singletonList(condition))).collect(Collectors.toList()));
+            conditions.stream().map(condition -> new RangerPolicyItemCondition(condition.getType(), condition.getValues())).forEach(policyItemConditions::add);
         }
+
+        policyItem.setConditions(policyItemConditions);
 
         switch (grant.getPrincipal().getType()) {
             case USER:
@@ -2220,5 +2269,10 @@ public class GdsREST {
         copy.setDelegateAdmin(policyItem.getDelegateAdmin());
 
         return copy;
+    }
+
+    private void extractDatasetMultiValueParams(HttpServletRequest request, SearchFilter filter) {
+        searchUtil.extractStringList(request, filter, SearchFilter.DATASET_LABEL, "Dataset Label List", "datasetLabels", null, null);
+        searchUtil.extractStringList(request, filter, SearchFilter.DATASET_KEYWORD, "Dataset Keyword List", "datasetKeywords", null, null);
     }
 }

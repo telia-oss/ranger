@@ -42,6 +42,9 @@ public class RangerServiceDef extends RangerBaseModelObject implements java.io.S
     public static final String OPTION_ENABLE_DENY_AND_EXCEPTIONS_IN_POLICIES = "enableDenyAndExceptionsInPolicies";
     public static final String OPTION_ENABLE_IMPLICIT_CONDITION_EXPRESSION   = "enableImplicitConditionExpression";
     public static final String OPTION_ENABLE_TAG_BASED_POLICIES              = "enableTagBasedPolicies";
+    public static final String OPTION_RRN_RESOURCE_SEP_CHAR                  = "rrnResourceSepChar";
+
+    public static final char DEFAULT_RRN_RESOURCE_SEP_CHAR = '/';
 
     private String                         name;
     private String                         displayName;
@@ -2005,9 +2008,11 @@ public class RangerServiceDef extends RangerBaseModelObject implements java.io.S
             }
             if (isValidLeaf == null) {
                 return other.isValidLeaf == null;
-            } else {
-                return isValidLeaf.equals(other.isValidLeaf);
+            } else if (!isValidLeaf.equals(other.isValidLeaf)) {
+                return false;
             }
+
+            return true;
         }
 
         @Override

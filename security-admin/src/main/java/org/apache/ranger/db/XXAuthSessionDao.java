@@ -68,6 +68,23 @@ public class XXAuthSessionDao extends BaseDao<XXAuthSession> {
         }
     }
 
+    public XXAuthSession getLastSuccessLoginAuthSessionByUserId(String loginId) {
+        if (loginId == null) {
+            return null;
+        }
+        try {
+            List<XXAuthSession> sessions = getEntityManager()
+                    .createNamedQuery("XXAuthSession.getSuccessAuthSessionsByUserId", tClass)
+                    .setParameter("loginId", loginId)
+                    .setParameter("authStatus", XXAuthSession.AUTH_STATUS_SUCCESS)
+                    .setMaxResults(2)
+                    .getResultList();
+            return sessions.size() >= 2 ? sessions.get(1) : null;
+        } catch (NoResultException ignoreNoResultFound) {
+            return null;
+        }
+    }
+
     public long getRecentAuthFailureCountByLoginId(String loginId, int timeRangezSecond) {
         Date utcDate             = DateUtil.getUTCDate();
         Date authWindowStartTime = new Date((utcDate != null ? utcDate.getTime() : System.currentTimeMillis()) - timeRangezSecond * 1000L);
@@ -101,9 +118,9 @@ public class XXAuthSessionDao extends BaseDao<XXAuthSession> {
         long ret = getEntityManager().createNamedQuery("XXAuthSession.deleteOlderThan").setParameter("olderThan", since).executeUpdate();
         LOG.info("Deleted {} x_auth_sess records", ret);
 
-        LOG.info("Updating x_trx_log.sess_id with null which are older than {} days, that is, older than {}", olderThanInDays, since);
-        long updated = getEntityManager().createNamedQuery("XXTrxLog.updateSessIdWithNull").setParameter("olderThan", since).executeUpdate();
-        LOG.info("Updated {} x_trx_log records", updated);
+        LOG.info("Updating x_trx_log_v2.sess_id with null which are older than {} days, that is, older than {}", olderThanInDays, since);
+        long updated = getEntityManager().createNamedQuery("XXTrxLogV2.updateSessIdWithNull").setParameter("olderThan", since).executeUpdate();
+        LOG.info("Updated {} x_trx_log_v2 records", updated);
         return ret;
     }
 }

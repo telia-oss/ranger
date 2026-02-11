@@ -36,11 +36,6 @@
             <artifactId>gson</artifactId>
         </dependency>
         <dependency>
-            <groupId>commons-lang</groupId>
-            <artifactId>commons-lang</artifactId>
-            <version>${commons.lang.version}</version>
-        </dependency>
-        <dependency>
             <groupId>org.apache.atlas</groupId>
             <artifactId>atlas-authorization</artifactId>
             <version>${atlas.version}</version>
@@ -52,13 +47,13 @@
             </exclusions>
         </dependency>
         <dependency>
-            <groupId>org.apache.ranger</groupId>
-            <artifactId>ranger-plugin-classloader</artifactId>
-            <version>${project.version}</version>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-lang3</artifactId>
+            <version>${commons.lang3.version}</version>
         </dependency>
         <dependency>
             <groupId>org.apache.ranger</groupId>
-            <artifactId>ranger-plugins-audit</artifactId>
+            <artifactId>ranger-plugin-classloader</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>

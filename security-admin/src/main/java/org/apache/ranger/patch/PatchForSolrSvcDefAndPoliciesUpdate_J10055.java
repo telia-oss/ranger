@@ -20,7 +20,7 @@ package org.apache.ranger.patch;
 
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.ranger.biz.SecurityZoneDBStore;
 import org.apache.ranger.biz.ServiceDBStore;
 import org.apache.ranger.common.RangerValidatorFactory;
@@ -301,6 +301,7 @@ public class PatchForSolrSvcDefAndPoliciesUpdate_J10055 extends BaseLoader {
                 SearchFilter filter = new SearchFilter();
 
                 filter.setParam(SearchFilter.SERVICE_NAME, dbService.getName());
+                filter.setParam(SearchFilter.FETCH_ZONE_UNZONE_POLICIES, "true");
 
                 updateTagPolicies(svcDBStore.getServicePolicies(dbService.getId(), filter));
             }

@@ -21,11 +21,13 @@ package org.apache.ranger.plugin.service;
 
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ranger.admin.client.RangerAdminClient;
 import org.apache.ranger.admin.client.RangerAdminRESTClient;
 import org.apache.ranger.audit.provider.AuditHandler;
 import org.apache.ranger.audit.provider.AuditProviderFactory;
+import org.apache.ranger.audit.provider.MiscUtil;
 import org.apache.ranger.audit.provider.StandAloneAuditProviderFactory;
 import org.apache.ranger.authorization.hadoop.config.RangerAuditConfig;
 import org.apache.ranger.authorization.hadoop.config.RangerPluginConfig;
@@ -40,6 +42,7 @@ import org.apache.ranger.plugin.model.RangerBaseModelObject;
 import org.apache.ranger.plugin.model.RangerPolicy;
 import org.apache.ranger.plugin.model.RangerRole;
 import org.apache.ranger.plugin.model.RangerServiceDef;
+import org.apache.ranger.plugin.model.validation.RangerServiceDefHelper;
 import org.apache.ranger.plugin.policyengine.RangerAccessRequest;
 import org.apache.ranger.plugin.policyengine.RangerAccessRequestImpl;
 import org.apache.ranger.plugin.policyengine.RangerAccessResourceImpl;
@@ -70,6 +73,7 @@ import org.apache.ranger.plugin.util.ServiceTags;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -80,25 +84,29 @@ import java.util.Hashtable;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 public class RangerBasePlugin {
     private static final Logger LOG = LoggerFactory.getLogger(RangerBasePlugin.class);
 
-    private final RangerPluginConfig          pluginConfig;
-    private final RangerPluginContext         pluginContext;
-    private final Map<String, LogHistory>     logHistoryList = new Hashtable<>();
-    private final int                         logInterval    = 30000; // 30 seconds
-    private final DownloadTrigger             accessTrigger  = new DownloadTrigger();
-    private final List<RangerChainedPlugin>   chainedPlugins;
-    private final boolean                     dedupStrings;
-    private       PolicyRefresher             refresher;
-    private       RangerPolicyEngine          policyEngine;
-    private       RangerAuthContext           currentAuthContext;
-    private       RangerAccessResultProcessor resultProcessor;
-    private       RangerRoles                 roles;
-    private       boolean                     isUserStoreEnricherAddedImplcitly;
-    private       Map<String, String>         serviceConfigs;
+    private final RangerPluginConfig        pluginConfig;
+    private final RangerPluginContext       pluginContext;
+    private final Map<String, LogHistory>   logHistoryList = new Hashtable<>();
+    private final int                       logInterval    = 30000; // 30 seconds
+    private final DownloadTrigger           accessTrigger  = new DownloadTrigger();
+    private final List<RangerChainedPlugin> chainedPlugins;
+    private final boolean                   dedupStrings;
+
+    private volatile RangerPolicyEngine  policyEngine;
+    private volatile RangerAuthContext   currentAuthContext;
+    private volatile RangerRoles         roles;
+    private volatile Map<String, String> serviceConfigs;
+
+    private PolicyRefresher             refresher;
+    private RangerAccessResultProcessor resultProcessor;
+    private boolean                     isUserStoreEnricherAddedImplcitly;
+    private boolean                     synchronousPolicyRefresh;
 
     public RangerBasePlugin(String serviceType, String appId) {
         this(new RangerPluginConfig(serviceType, null, appId, null, null, null));
@@ -135,6 +143,58 @@ public class RangerBasePlugin {
         setIsFallbackSupported(pluginConfig.getBoolean(pluginConfig.getPropertyPrefix() + ".is.fallback.supported", false));
         setServiceAdmins(serviceAdmins);
 
+        String  ugiPrefix = pluginConfig.getPropertyPrefix() + ".ugi";
+        boolean initUgi   = pluginConfig.getBoolean(ugiPrefix + ".initialize", false);
+
+        if (initUgi) {
+            String ugiLoginType = pluginConfig.get(ugiPrefix + ".login.type");
+
+            if (StringUtils.equalsIgnoreCase(ugiLoginType, "keytab")) {
+                String principal = pluginConfig.get(ugiPrefix + ".keytab.principal");
+                String keytab    = pluginConfig.get(ugiPrefix + ".keytab.file");
+
+                if (StringUtils.isNotBlank(principal) && StringUtils.isNotBlank(keytab)) {
+                    LOG.info("UGI login: principal={}, keytab={}", principal, keytab);
+
+                    try {
+                        UserGroupInformation.loginUserFromKeytab(principal, keytab);
+                    } catch (IOException excp) {
+                        LOG.error("UGI login: failed", excp);
+
+                        throw new RuntimeException(excp);
+                    }
+                } else {
+                    String msg = String.format("UGI login: invalid configuration: %s=%s, %s=%s", ugiPrefix + ".keytab.principal", principal, ugiPrefix + ".keytab.file", keytab);
+
+                    LOG.error(msg);
+
+                    throw new RuntimeException(msg);
+                }
+            } else if (StringUtils.equalsIgnoreCase(ugiLoginType, "jaas")) {
+                String jaasAppConfig = pluginConfig.get(ugiPrefix + ".jaas.appconfig");
+
+                if (StringUtils.isNotBlank(jaasAppConfig)) {
+                    LOG.info("UGI login: jaasAppConfig={}", jaasAppConfig);
+
+                    try {
+                        MiscUtil.setUGIFromJAASConfig(jaasAppConfig);
+                    } catch (Exception excp) {
+                        LOG.error("UGI login: jaasAppConfig={} failed", jaasAppConfig, excp);
+
+                        throw new RuntimeException(excp);
+                    }
+                } else {
+                    String msg = String.format("UGI login: invalid configuration: %s=%s", ugiPrefix + ".jaas.appconfig", jaasAppConfig);
+
+                    LOG.error(msg);
+
+                    throw new RuntimeException(msg);
+                }
+            } else {
+                LOG.warn("UGI login: invalid configuration {}={}", ugiPrefix + ".login.type", ugiLoginType);
+            }
+        }
+
         RangerRequestScriptEvaluator.init(pluginConfig);
 
         this.dedupStrings   = pluginConfig.getBoolean(pluginConfig.getPropertyPrefix() + ".dedup.strings", true);
@@ -153,7 +213,6 @@ public class RangerBasePlugin {
         this(pluginConfig);
 
         init();
-
         setPolicies(policies);
         setRoles(roles);
 
@@ -308,6 +367,12 @@ public class RangerBasePlugin {
         pluginConfig.setServiceAdmins(users);
     }
 
+    public RangerServiceDefHelper getServiceDefHelper() {
+        RangerPolicyEngine policyEngine = this.policyEngine;
+
+        return policyEngine != null ? policyEngine.getServiceDefHelper() : null;
+    }
+
     public RangerServiceDef getServiceDef() {
         RangerPolicyEngine policyEngine = this.policyEngine;
 
@@ -386,8 +451,6 @@ public class RangerBasePlugin {
 
     public void setPolicies(ServicePolicies policies) {
         LOG.debug("==> setPolicies({})", policies);
-
-        this.serviceConfigs = (policies != null && policies.getServiceConfig() != null) ? policies.getServiceConfig() : new HashMap<>();
 
         if (pluginConfig.isEnableImplicitUserStoreEnricher() && policies != null && !ServiceDefUtil.isUserStoreEnricherPresent(policies)) {
             String retrieverClassName = pluginConfig.get(RangerUserStoreEnricher.USERSTORE_RETRIEVER_CLASSNAME_OPTION, RangerAdminUserStoreRetriever.class.getCanonicalName());
@@ -528,6 +591,8 @@ public class RangerBasePlugin {
                         newPolicyEngine.setTrustedProxyAddresses(pluginConfig.getTrustedProxyAddresses());
                     }
 
+                    setServiceConfigs(policies.getServiceConfig());
+
                     LOG.info("Switching policy engine from [{}]", getPolicyVersion());
                     this.policyEngine = newPolicyEngine;
                     LOG.info("Switched policy engine to [{}]", getPolicyVersion());
@@ -556,7 +621,7 @@ public class RangerBasePlugin {
             } else {
                 LOG.warn("Leaving current policy engine as-is");
                 LOG.warn("Policies are not saved to cache. policyVersion in the policy-cache may be different than in Ranger-admin, even though the policies are the same!");
-                LOG.warn("Ranger-PolicyVersion:[{}], Cached-PolicyVersion:[{}]", policies != null ? policies.getPolicyVersion() : -1L, this.policyEngine != null ? this.policyEngine.getPolicyVersion() : -1L);
+                LOG.warn("Ranger-PolicyVersion:[{}], Cached-PolicyVersion:[{}]", policies != null ? policies.getPolicyVersion() : -1L, getPoliciesVersion());
             }
         } catch (Exception e) {
             LOG.error("setPolicies: policy engine initialization failed!  Leaving current policy engine as-is. Exception : ", e);
@@ -598,6 +663,10 @@ public class RangerBasePlugin {
     }
 
     public RangerAccessResult isAccessAllowed(RangerAccessRequest request, RangerAccessResultProcessor resultProcessor) {
+        if (this.synchronousPolicyRefresh) {
+            refreshPoliciesAndTags();
+        }
+
         RangerAccessResult ret          = null;
         RangerPolicyEngine policyEngine = this.policyEngine;
 
@@ -639,6 +708,10 @@ public class RangerBasePlugin {
     }
 
     public Collection<RangerAccessResult> isAccessAllowed(Collection<RangerAccessRequest> requests, RangerAccessResultProcessor resultProcessor) {
+        if (this.synchronousPolicyRefresh) {
+            refreshPoliciesAndTags();
+        }
+
         Collection<RangerAccessResult> ret          = null;
         RangerPolicyEngine             policyEngine = this.policyEngine;
 
@@ -680,6 +753,10 @@ public class RangerBasePlugin {
     }
 
     public RangerAccessResult evalDataMaskPolicies(RangerAccessRequest request, RangerAccessResultProcessor resultProcessor) {
+        if (this.synchronousPolicyRefresh) {
+            refreshPoliciesAndTags();
+        }
+
         RangerPolicyEngine policyEngine = this.policyEngine;
         RangerAccessResult ret          = null;
 
@@ -710,6 +787,10 @@ public class RangerBasePlugin {
     }
 
     public RangerAccessResult evalRowFilterPolicies(RangerAccessRequest request, RangerAccessResultProcessor resultProcessor) {
+        if (this.synchronousPolicyRefresh) {
+            refreshPoliciesAndTags();
+        }
+
         RangerPolicyEngine policyEngine = this.policyEngine;
         RangerAccessResult ret          = null;
 
@@ -740,6 +821,10 @@ public class RangerBasePlugin {
     }
 
     public void evalAuditPolicies(RangerAccessResult result) {
+        if (this.synchronousPolicyRefresh) {
+            refreshPoliciesAndTags();
+        }
+
         RangerPolicyEngine policyEngine = this.policyEngine;
 
         if (policyEngine != null) {
@@ -762,6 +847,10 @@ public class RangerBasePlugin {
     }
 
     public RangerResourceACLs getResourceACLs(RangerAccessRequest request, Integer policyType) {
+        if (this.synchronousPolicyRefresh) {
+            refreshPoliciesAndTags();
+        }
+
         RangerResourceACLs ret          = null;
         RangerPolicyEngine policyEngine = this.policyEngine;
 
@@ -828,14 +917,11 @@ public class RangerBasePlugin {
     }
 
     public Set<RangerRole> getRangerRoleForPrincipal(String principal, String type) {
-        Set<RangerRole>          ret         = new HashSet<>();
-        Set<RangerRole>          rangerRoles = null;
-        Map<String, Set<String>> roleMapping = null;
-        RangerRoles              roles       = getRangerRoles();
-
-        if (roles != null) {
-            rangerRoles = roles.getRangerRoles();
-        }
+        Set<RangerRole>          ret          = new HashSet<>();
+        RangerPolicyEngine       policyEngine = this.policyEngine;
+        RangerRoles              roles        = policyEngine != null ? policyEngine.getRangerRoles() : null;
+        Set<RangerRole>          rangerRoles  = roles != null ? roles.getRangerRoles() : null;
+        Map<String, Set<String>> roleMapping  = null;
 
         if (rangerRoles != null) {
             RangerPluginContext rangerPluginContext = policyEngine.getPluginContext();
@@ -875,6 +961,7 @@ public class RangerBasePlugin {
                 }
             }
         }
+
         return ret;
     }
 
@@ -1005,21 +1092,17 @@ public class RangerBasePlugin {
     }
 
     public void refreshPoliciesAndTags() {
-        LOG.debug("==> refreshPoliciesAndTags()");
+        LOG.debug("==> refreshPoliciesAndTags(): synchronousPolicyRefresh={}", synchronousPolicyRefresh);
 
         try {
-            RangerPolicyEngine policyEngine = this.policyEngine;
+            long oldPolicyVersion = getPoliciesVersion();
 
             // Synch-up policies
-            long oldPolicyVersion = policyEngine.getPolicyVersion();
-
             if (refresher != null) {
                 refresher.syncPoliciesWithAdmin(accessTrigger);
             }
 
-            policyEngine = this.policyEngine; // might be updated in syncPoliciesWithAdmin()
-
-            long newPolicyVersion = policyEngine.getPolicyVersion();
+            long newPolicyVersion = getPoliciesVersion();
 
             if (oldPolicyVersion == newPolicyVersion) {
                 // Synch-up tags
@@ -1137,15 +1220,37 @@ public class RangerBasePlugin {
     }
 
     public Map<String, String> getServiceConfigs() {
-        return serviceConfigs;
+        return (serviceConfigs == null) ? Collections.emptyMap() : serviceConfigs;
     }
 
     public Long getPolicyVersion() {
-        return this.policyEngine == null ? -1L : this.policyEngine.getPolicyVersion();
+        RangerPolicyEngine policyEngine = this.policyEngine;
+
+        return policyEngine == null ? -1L : policyEngine.getPolicyVersion();
     }
 
     protected RangerPolicyEngine getPolicyEngine() {
         return policyEngine;
+    }
+
+    private void setServiceConfigs(Map<String, String> serviceConfigs) {
+        Map<String, String> oldServiceConfigs = this.serviceConfigs;
+
+        this.serviceConfigs = serviceConfigs != null ? serviceConfigs : new HashMap<>();
+
+        RangerAuthContext authContext = this.pluginContext.getAuthContext();
+
+        if (authContext != null && !Objects.equals(oldServiceConfigs, this.serviceConfigs)) {
+            authContext.onServiceConfigsUpdate(this.serviceConfigs);
+        }
+
+        String isSyncPolicyRefresh = this.pluginConfig == null ? null : this.serviceConfigs.get(this.pluginConfig.getPropertyPrefix() + ".policy.refresh.synchronous");
+
+        this.synchronousPolicyRefresh = Boolean.parseBoolean(isSyncPolicyRefresh);
+
+        if (this.synchronousPolicyRefresh) {
+            LOG.info("synchronousPolicyRefresh = {}", this.synchronousPolicyRefresh);
+        }
     }
 
     private void auditGrantRevoke(GrantRevokeRequest request, String action, boolean isSuccess, RangerAccessResultProcessor resultProcessor) {
@@ -1351,13 +1456,13 @@ public class RangerBasePlugin {
 
                 switch (userType) {
                     case USER:
-                        baseResourceACLs.setUserAccessInfo(name, chainedAccessType, finalAccessResult.getResult(), finalAccessResult.getPolicy());
+                        baseResourceACLs.setUserAccessInfo(name, chainedAccessType, finalAccessResult);
                         break;
                     case GROUP:
-                        baseResourceACLs.setGroupAccessInfo(name, chainedAccessType, finalAccessResult.getResult(), finalAccessResult.getPolicy());
+                        baseResourceACLs.setGroupAccessInfo(name, chainedAccessType, finalAccessResult);
                         break;
                     case ROLE:
-                        baseResourceACLs.setRoleAccessInfo(name, chainedAccessType, finalAccessResult.getResult(), finalAccessResult.getPolicy());
+                        baseResourceACLs.setRoleAccessInfo(name, chainedAccessType, finalAccessResult);
                         break;
                     default:
                         break;

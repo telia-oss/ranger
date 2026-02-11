@@ -19,7 +19,7 @@
 
 package org.apache.ranger.plugin.policyengine.gds;
 
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.ranger.plugin.model.RangerPolicy;
 import org.apache.ranger.plugin.model.RangerServiceDef;
 import org.apache.ranger.plugin.policyengine.RangerAccessRequest;
@@ -111,6 +111,7 @@ public class GdsDatasetEvaluator {
 
         if (isActive()) {
             result.addDataset(getName());
+            result.addDatasetId(getId());
 
             if (!policyEvaluators.isEmpty()) {
                 GdsDatasetAccessRequest datasetRequest = new GdsDatasetAccessRequest(getId(), gdsServiceDef, request);

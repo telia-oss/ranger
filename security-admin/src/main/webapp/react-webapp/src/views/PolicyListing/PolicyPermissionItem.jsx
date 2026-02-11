@@ -43,7 +43,8 @@ import {
   drop,
   dragOver,
   policyConditionUpdatedJSON
-} from "../../utils/XAUtils";
+} from "Utils/XAUtils";
+import { selectInputCustomStyles } from "Components/CommonComponents";
 
 const noneOptions = {
   label: "None",
@@ -285,6 +286,7 @@ export default function PolicyPermissionItem(props) {
   };
 
   const customStyles = {
+    ...selectInputCustomStyles,
     control: (base) => ({
       ...base,
       width: 200,
@@ -369,6 +371,8 @@ export default function PolicyPermissionItem(props) {
                                       styles={customStyles}
                                       cacheOptions
                                       isMulti
+                                      tabSelectsValue={false}
+                                      placeholder="Select Roles"
                                     />
                                   </div>
                                 )}
@@ -400,6 +404,8 @@ export default function PolicyPermissionItem(props) {
                                       styles={customStyles}
                                       cacheOptions
                                       isMulti
+                                      tabSelectsValue={false}
+                                      placeholder="Select Groups"
                                     />
                                   </div>
                                 )}
@@ -431,6 +437,8 @@ export default function PolicyPermissionItem(props) {
                                       styles={customStyles}
                                       cacheOptions
                                       isMulti
+                                      tabSelectsValue={false}
+                                      placeholder="Select Users"
                                     />
                                   </div>
                                 )}

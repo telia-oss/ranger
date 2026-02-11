@@ -53,6 +53,7 @@ then
     downloadIfNotPresent hbase-${HBASE_VERSION}-bin.tar.gz      https://archive.apache.org/dist/hbase/${HBASE_VERSION}
     downloadIfNotPresent apache-hive-${HIVE_VERSION}-bin.tar.gz https://archive.apache.org/dist/hive/hive-${HIVE_VERSION}
     downloadIfNotPresent hadoop-${HIVE_HADOOP_VERSION}.tar.gz   https://archive.apache.org/dist/hadoop/common/hadoop-${HIVE_HADOOP_VERSION}
+    downloadIfNotPresent apache-tez-${TEZ_VERSION}-bin.tar.gz   https://archive.apache.org/dist/tez/${TEZ_VERSION}
     downloadIfNotPresent kafka_2.12-${KAFKA_VERSION}.tgz        https://archive.apache.org/dist/kafka/${KAFKA_VERSION}
     downloadIfNotPresent knox-${KNOX_VERSION}.tar.gz            https://archive.apache.org/dist/knox/${KNOX_VERSION}
     downloadIfNotPresent ozone-${OZONE_VERSION}.tar.gz          https://archive.apache.org/dist/ozone/${OZONE_VERSION}
@@ -60,6 +61,7 @@ then
     then
       tar xvfz downloads/ozone-${OZONE_VERSION}.tar.gz --directory=downloads/
     fi
+    downloadIfNotPresent opensearch-${OPENSEARCH_VERSION}-linux-x64.tar.gz https://artifacts.opensearch.org/releases/bundle/opensearch/${OPENSEARCH_VERSION}
 else
   for arg in "$@"; do
     if [[ $arg == 'hadoop' ]]
@@ -72,6 +74,7 @@ else
     then
       downloadIfNotPresent apache-hive-${HIVE_VERSION}-bin.tar.gz https://archive.apache.org/dist/hive/hive-${HIVE_VERSION}
       downloadIfNotPresent hadoop-${HIVE_HADOOP_VERSION}.tar.gz   https://archive.apache.org/dist/hadoop/common/hadoop-${HIVE_HADOOP_VERSION}
+      downloadIfNotPresent apache-tez-${TEZ_VERSION}-bin.tar.gz   https://archive.apache.org/dist/tez/${TEZ_VERSION}
     elif [[ $arg == 'kafka' ]]
     then
       downloadIfNotPresent kafka_2.12-${KAFKA_VERSION}.tgz        https://archive.apache.org/dist/kafka/${KAFKA_VERSION}
@@ -85,6 +88,9 @@ else
       then
         tar xvfz downloads/ozone-${OZONE_VERSION}.tar.gz --directory=downloads/
       fi
+    elif [[ $arg == 'opensearch' ]]
+    then
+      downloadIfNotPresent opensearch-${OPENSEARCH_VERSION}-linux-x64.tar.gz https://artifacts.opensearch.org/releases/bundle/opensearch/${OPENSEARCH_VERSION}
     else
       echo "Passed argument $arg is invalid!"
     fi

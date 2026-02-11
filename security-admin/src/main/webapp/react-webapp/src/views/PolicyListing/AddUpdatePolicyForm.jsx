@@ -49,7 +49,13 @@ import {
   cloneDeep
 } from "lodash";
 import { toast } from "react-toastify";
-import { Loader, scrollToError } from "Components/CommonComponents";
+import {
+  BlockUi,
+  Loader,
+  scrollToError,
+  selectInputCustomStyles,
+  trimInputValue
+} from "Components/CommonComponents";
 import { fetchApi } from "Utils/fetchAPI";
 import { RangerPolicyType, getEnumElementByValue } from "Utils/XAEnums";
 import ResourceComp from "../Resources/ResourceComp";
@@ -57,21 +63,21 @@ import PolicyPermissionItem from "../PolicyListing/PolicyPermissionItem";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import PolicyValidityPeriodComp from "./PolicyValidityPeriodComp";
 import PolicyConditionsComp from "./PolicyConditionsComp";
-import { getAllTimeZoneList, policyConditionUpdatedJSON } from "Utils/XAUtils";
 import moment from "moment";
 import {
   InfoIcon,
   commonBreadcrumb,
   isPolicyExpired,
-  getResourcesDefVal
-} from "../../utils/XAUtils";
+  getResourcesDefVal,
+  getAllTimeZoneList,
+  policyConditionUpdatedJSON,
+  policyInfo
+} from "Utils/XAUtils";
 import { useAccordionButton } from "react-bootstrap/AccordionButton";
 import AccordionContext from "react-bootstrap/AccordionContext";
 import usePrompt from "Hooks/usePrompt";
-import { RegexMessage } from "../../utils/XAMessages";
-import { policyInfo } from "Utils/XAUtils";
-import { BlockUi } from "../../components/CommonComponents";
-import { getServiceDef } from "../../utils/appState";
+import { RegexMessage } from "Utils/XAMessages";
+import { getServiceDef } from "Utils/appState";
 import { FieldArray } from "react-final-form-arrays";
 
 const noneOptions = {
@@ -212,14 +218,14 @@ export default function AddUpdatePolicyForm() {
     let op = [];
 
     const roleResp = await fetchApi({
-      url: "roles/roles",
+      url: "roles/lookup/roles/names",
       params: params
     });
-    op = roleResp.data.roles;
+    op = roleResp.data.vXStrings;
 
     return op.map((obj) => ({
-      label: obj.name,
-      value: obj.name
+      label: obj.value,
+      value: obj.value
     }));
   };
 
@@ -286,7 +292,7 @@ export default function AddUpdatePolicyForm() {
   const fetchPolicyLabel = async (inputValue) => {
     let params = {};
     if (inputValue) {
-      params["policyLabel"] = inputValue || "";
+      params["policyLabel"] = inputValue.trim() || "";
     }
     const policyLabelResp = await fetchApi({
       url: "plugins/policyLabels",
@@ -294,8 +300,8 @@ export default function AddUpdatePolicyForm() {
     });
 
     return policyLabelResp.data.map((name) => ({
-      label: name,
-      value: name
+      label: name.trim(),
+      value: name.trim()
     }));
   };
 
@@ -386,12 +392,12 @@ export default function AddUpdatePolicyForm() {
       data.policyName = policyData?.name;
       data.isEnabled = policyData?.isEnabled;
       data.policyPriority = policyData?.policyPriority == 0 ? false : true;
-      data.description = policyData?.description;
+      data.description = policyData?.description?.trim();
       data.isAuditEnabled = policyData?.isAuditEnabled;
       data.policyLabel =
         policyData &&
         policyData?.policyLabels?.map((val) => {
-          return { label: val, value: val };
+          return { label: val?.trim(), value: val?.trim() };
         });
       if (policyData?.resources) {
         if (!isMultiResources) {
@@ -400,7 +406,7 @@ export default function AddUpdatePolicyForm() {
             let setResources = find(serviceCompResourcesDetails, ["name", key]);
             data[`resourceName-${setResources?.level}`] = setResources;
             data[`value-${setResources?.level}`] = value.values.map((m) => {
-              return { label: m, value: m };
+              return { label: m?.trim(), value: m?.trim() };
             });
             if (setResources?.excludesSupported) {
               data[`isExcludesSupport-${setResources?.level}`] =
@@ -445,7 +451,7 @@ export default function AddUpdatePolicyForm() {
                   setResources;
                 additionalResourcesObj[`value-${setResources?.level}`] =
                   value.values.map((m) => {
-                    return { label: m, value: m };
+                    return { label: m?.trim(), value: m?.trim() };
                   });
                 if (setResources?.excludesSupported) {
                   additionalResourcesObj[
@@ -516,7 +522,7 @@ export default function AddUpdatePolicyForm() {
             data.conditions[val?.type] = JSON.parse(conditionObj.uiHint)
               .isMultiValue
               ? val?.values
-              : val?.values.toString();
+              : val?.values.toString().trim();
           }
         }
       }
@@ -706,9 +712,9 @@ export default function AddUpdatePolicyForm() {
             obj.conditions[data?.type] = JSON.parse(conditionObj.uiHint)
               .isMultiValue
               ? data?.values.map((m) => {
-                  return { value: m, label: m };
+                  return { value: m.trim(), label: m.trim() };
                 })
-              : data?.values.toString();
+              : data?.values.toString().trim();
           }
         }
       }
@@ -884,7 +890,7 @@ export default function AddUpdatePolicyForm() {
       data["conditions"] = [];
     }
 
-    /* For create zoen policy*/
+    /* For create zone policy*/
     if (localStorage.getItem("zoneDetails") != null) {
       data["zoneName"] = JSON.parse(localStorage.getItem("zoneDetails")).label;
     }
@@ -922,14 +928,17 @@ export default function AddUpdatePolicyForm() {
           method: "POST",
           data
         });
-        let tblpageData = {};
+        let tablePageData = {};
         if (state && state != null) {
-          tblpageData = state.tblpageData;
-          if (state.tblpageData.pageRecords % state.tblpageData.pageSize == 0) {
-            tblpageData["totalPage"] = state.tblpageData.totalPage + 1;
+          tablePageData = state.tablePageData;
+          if (
+            state.tablePageData.pageRecords % state.tablePageData.pageSize ==
+            0
+          ) {
+            tablePageData["totalPage"] = state.tablePageData.totalPage + 1;
           } else {
-            if (tblpageData !== undefined) {
-              tblpageData["totalPage"] = state.tblpageData.totalPage;
+            if (tablePageData !== undefined) {
+              tablePageData["totalPage"] = state.tablePageData.totalPage;
             }
           }
         }
@@ -939,7 +948,7 @@ export default function AddUpdatePolicyForm() {
         navigate(`/service/${serviceId}/policies/${policyType}`, {
           state: {
             showLastPage: true,
-            addPageData: tblpageData
+            addPageData: tablePageData
           }
         });
       } catch (error) {
@@ -1295,6 +1304,7 @@ export default function AddUpdatePolicyForm() {
                                           : "form-control"
                                       }
                                       data-cy="policyName"
+                                      onBlur={(e) => trimInputValue(e, input)}
                                     />
                                     <InfoIcon
                                       css="input-box-info-icon"
@@ -1384,6 +1394,26 @@ export default function AddUpdatePolicyForm() {
                                     onFocusPolicyLabel();
                                   }}
                                   defaultOptions={defaultPolicyLabelOptions}
+                                  styles={selectInputCustomStyles}
+                                  // Add this prop to trim the visual "Create" label
+                                  formatCreateLabel={(inputValue) =>
+                                    `Create "${inputValue.trim()}"`
+                                  }
+                                  // Add this prop to trim the value when a tag is created
+                                  onCreateOption={(inputValue) => {
+                                    const policyLabelVal = inputValue.trim();
+                                    if (policyLabelVal) {
+                                      input.onChange([
+                                        ...input.value,
+                                        {
+                                          label: policyLabelVal,
+                                          value: policyLabelVal
+                                        }
+                                      ]);
+                                    }
+                                  }}
+                                  tabSelectsValue={false}
+                                  placeholder="Add Policy Labels"
                                 />
                               </Col>
                             </FormB.Group>
@@ -1416,6 +1446,7 @@ export default function AddUpdatePolicyForm() {
                                   as="textarea"
                                   rows={3}
                                   data-cy="description"
+                                  onBlur={(e) => trimInputValue(e, input)}
                                 />
                               </Col>
                             </FormB.Group>

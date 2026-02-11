@@ -20,7 +20,7 @@
 package org.apache.ranger.plugin.policyevaluator;
 
 import org.apache.commons.collections.CollectionUtils;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.ranger.plugin.model.RangerPolicy;
 import org.apache.ranger.plugin.model.RangerPolicy.RangerDataMaskPolicyItem;
 import org.apache.ranger.plugin.model.RangerPolicy.RangerPolicyItem;
@@ -604,6 +604,17 @@ public interface RangerPolicyEvaluator {
                     }
                 }
             }
+        }
+
+        @Override
+        public String toString() {
+            return "PolicyACLSummary{" +
+                    "usersAccessInfo=" + usersAccessInfo +
+                    ", groupsAccessInfo=" + groupsAccessInfo +
+                    ", rolesAccessInfo=" + rolesAccessInfo +
+                    ", rowFilters=" + rowFilters +
+                    ", dataMasks=" + dataMasks +
+                    '}';
         }
 
         private void addAccess(String accessorName, AccessorType accessorType, String accessType, Integer access, int policyItemType) {

@@ -20,8 +20,8 @@
 package org.apache.ranger.biz;
 
 import org.apache.commons.collections.CollectionUtils;
-import org.apache.commons.lang.StringUtils;
-import org.apache.commons.lang.time.DateUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.time.DateUtils;
 import org.apache.ranger.common.DateUtil;
 import org.apache.ranger.common.HTTPUtil;
 import org.apache.ranger.common.MessageEnums;
@@ -473,6 +473,18 @@ public class SessionMgr {
                 this.resetUserModulePermission(userSession);
             }
         }
+    }
+
+    public Date getLastSuccessLoginAuthTimeByUserId(String loginId) {
+        XXAuthSession xXAuthSession = daoManager.getXXAuthSession().getLastSuccessLoginAuthSessionByUserId(loginId);
+
+        if (xXAuthSession != null) {
+            return authSessionService.populateViewBean(xXAuthSession).getAuthTime();
+        } else {
+            logger.info("Session cleaned up or  User logged in for first time");
+        }
+
+        return null;
     }
 
     protected boolean validateUserSession(UserSessionBase userSession, String currentLoginId) {

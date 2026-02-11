@@ -469,13 +469,13 @@
         </dependency>
         <dependency>
             <groupId>org.bouncycastle</groupId>
-            <artifactId>bcpkix-jdk15on</artifactId>
-            <version>${org.bouncycastle.bcpkix-jdk15on}</version>
+            <artifactId>bcpkix-jdk18on</artifactId>
+            <version>${org.bouncycastle.bcpkix-jdk18on}</version>
         </dependency>
         <dependency>
             <groupId>org.bouncycastle</groupId>
-            <artifactId>bcprov-jdk15on</artifactId>
-            <version>${org.bouncycastle.bcprov-jdk15on}</version>
+            <artifactId>bcprov-jdk18on</artifactId>
+            <version>${org.bouncycastle.bcprov-jdk18on}</version>
         </dependency>
         <dependency>
             <groupId>org.codehaus.jettison</groupId>
@@ -497,11 +497,6 @@
             <artifactId>jul-to-slf4j</artifactId>
             <version>${slf4j.version}</version>
             <scope>compile</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.slf4j</groupId>
-            <artifactId>log4j-over-slf4j</artifactId>
-            <version>${slf4j.version}</version>
         </dependency>
         <dependency>
             <groupId>org.springframework</groupId>
@@ -611,7 +606,7 @@
         <!-- Test -->
         <dependency>
             <groupId>org.junit.jupiter</groupId>
-            <artifactId>junit-jupiter-api</artifactId>
+            <artifactId>junit-jupiter</artifactId>
             <version>${junit.jupiter.version}</version>
             <scope>test</scope>
         </dependency>

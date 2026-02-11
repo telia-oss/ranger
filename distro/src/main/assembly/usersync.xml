@@ -44,18 +44,20 @@
 							<include>com.sun.jersey:jersey-bundle</include>
 							<include>commons-cli:commons-cli</include>
 							<include>commons-collections:commons-collections</include>
-							<include>commons-lang:commons-lang</include>
 							<include>commons-logging:commons-logging</include>
-							<include>org.apache.hadoop:hadoop-auth</include>
+							<include>org.apache.hadoop:hadoop-auth:jar:${hadoop.version}</include>
+							<include>org.apache.hadoop:hadoop-client-api:jar:${hadoop.version}</include>
+							<include>org.apache.hadoop:hadoop-client-runtime:jar:${hadoop.version}</include>
 							<include>org.slf4j:slf4j-api:jar:${slf4j.version}</include>
-							<include>org.apache.hadoop:hadoop-common</include>
 							<include>org.apache.commons:commons-csv</include>
 							<include>org.apache.ranger:credentialbuilder</include>
 							<include>org.apache.ranger:ranger-util</include>
 							<include>commons-io:commons-io:jar:${commons.io.version}</include>
 							<include>org.apache.httpcomponents:httpclient:jar:${httpcomponents.httpclient.version}</include>
 							<include>commons-codec:commons-codec</include>
+							<include>org.apache.ranger:ranger-authz-api</include>
 							<include>org.apache.ranger:ranger-plugins-common</include>
+							<include>org.apache.ranger:ugsync-util</include>
 							<include>org.apache.ranger:ranger-common-ha:jar:${project.version}</include>
 							<include>org.apache.curator:curator-framework:jar:${curator.version}</include>
 							<include>org.apache.curator:curator-recipes:jar:${curator.version}</include>
@@ -68,6 +70,7 @@
 							<include>net.java.dev.jna:jna-platform:jar:${jna-platform.version}</include>
 							<include>com.fasterxml.woodstox:woodstox-core:jar:${fasterxml.woodstox.version}</include>
 							<include>org.codehaus.woodstox:stax2-api:jar:${codehaus.woodstox.stax2api.version}</include>
+							<include>org.apache.commons:commons-collections4:jar:${commons.collections4.version}</include>
 							<include>org.apache.commons:commons-configuration2:jar:${commons.configuration.version}</include>
 							<include>org.cloudera.logredactor:logredactor</include>
 							<include>com.fasterxml.jackson.core:jackson-annotations:jar:${fasterxml.jackson.version}</include>
@@ -82,7 +85,7 @@
 							<include>ch.qos.logback:logback-classic:jar:${logback.version}</include>
 							<include>org.slf4j:log4j-over-slf4j:jar:${${slf4j.version}}</include>
 							<include>ch.qos.logback:logback-core:jar:${logback.version}</include>
-                                                        <include>org.apache.hadoop.thirdparty:hadoop-shaded-guava:jar:${hadoop-shaded-guava.version}</include>
+							<include>org.apache.hadoop.thirdparty:hadoop-shaded-guava:jar:${hadoop-shaded-guava.version}</include>
 						</includes>
 					</dependencySet>
 					<dependencySet>
@@ -91,7 +94,6 @@
 						<includes>
 							<include>commons-cli:commons-cli</include>
 							<include>org.apache.commons:commons-configuration2</include>
-							<include>commons-lang:commons-lang</include>
 							<include>commons-logging:commons-logging</include>
 						</includes>
 					</dependencySet>

@@ -23,6 +23,7 @@ import CreatableSelect from "react-select/creatable";
 import { debounce, isArray } from "lodash";
 import { toast } from "react-toastify";
 import { fetchApi } from "Utils/fetchAPI";
+import { selectInputCustomStyles } from "Components/CommonComponents";
 
 const noneOptions = {
   label: "None",
@@ -36,8 +37,7 @@ export default function ResourceSelectComp(props) {
     levelKey,
     serviceDetails,
     name,
-    isMultiResources,
-    changePolicyItemPermissions
+    isMultiResources
   } = props;
   const [options, setOptions] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -93,7 +93,7 @@ export default function ResourceSelectComp(props) {
         toastId.current = toast.error(error.response.data.msgDesc);
       } else {
         toastId.current = toast.error(
-          "Resouce lookup failed for current resource"
+          "Resource lookup failed for current resource"
         );
       }
     }
@@ -215,6 +215,21 @@ export default function ResourceSelectComp(props) {
             }}
             filterOption={customFilterOptions}
             isLoading={isLoading}
+            styles={selectInputCustomStyles}
+            formatCreateLabel={(inputValue) => `Create "${inputValue.trim()}"`}
+            onCreateOption={(inputValue) => {
+              const trimmedValue = inputValue.trim();
+              if (trimmedValue) {
+                const newOption = { label: trimmedValue, value: trimmedValue };
+                const currentValue = input.value || [];
+                const newValue = isArray(currentValue)
+                  ? [...currentValue, newOption]
+                  : [newOption];
+                input.onChange(newValue);
+              }
+            }}
+            tabSelectsValue={false}
+            placeholder="Add policy Resources"
           />
           {formValues &&
             formValues[`resourceName-${levelKey}`]?.mandatory &&

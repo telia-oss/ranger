@@ -21,8 +21,8 @@ package org.apache.ranger.authorization.hive.authorizer;
 
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
-import org.apache.commons.lang.ArrayUtils;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -97,6 +97,7 @@ import java.util.regex.Pattern;
 public class RangerHiveAuthorizer extends RangerHiveAuthorizerBase {
     private static final Logger LOG                       = LoggerFactory.getLogger(RangerHiveAuthorizer.class);
     private static final Logger PERF_HIVEAUTH_REQUEST_LOG = RangerPerfTracer.getPerfLogger("hiveauth.request");
+    private static final Logger PERF_HIVEAUTH_COARSEURI_LOG = RangerPerfTracer.getPerfLogger("hiveauth.coarsecheck");
 
     private static final char        COLUMN_SEP                    = ',';
     private static final String      HIVE_CONF_VAR_QUERY_STRING    = "hive.query.string";
@@ -172,14 +173,16 @@ public class RangerHiveAuthorizer extends RangerHiveAuthorizerBase {
     static void setOwnerUser(RangerHiveResource resource, HivePrivilegeObject hiveObj, IMetaStoreClient metaStoreClient, Map<String, String> objOwners) {
         if (hiveObj != null) {
             String objName = null;
-            String owner   = null;
+            String owner   = hiveObj.getOwnerName();
 
             // resource.setOwnerUser(hiveObj.getOwnerName());
             switch (hiveObj.getType()) {
                 case DATABASE:
                     try {
                         objName = hiveObj.getDbname();
-                        owner   = objOwners != null ? objOwners.get(objName) : null;
+                        if (StringUtils.isBlank(owner) && objOwners != null) {
+                            owner = objOwners.get(objName);
+                        }
 
                         if (StringUtils.isBlank(owner)) {
                             Database database = metaStoreClient != null ? metaStoreClient.getDatabase(hiveObj.getDbname()) : null;
@@ -199,7 +202,9 @@ public class RangerHiveAuthorizer extends RangerHiveAuthorizerBase {
                 case COLUMN:
                     try {
                         objName = hiveObj.getDbname() + "." + hiveObj.getObjectName();
-                        owner   = objOwners != null ? objOwners.get(objName) : null;
+                        if (StringUtils.isBlank(owner) && objOwners != null) {
+                            owner = objOwners.get(objName);
+                        }
 
                         if (StringUtils.isBlank(owner)) {
                             Table table = metaStoreClient != null ? metaStoreClient.getTable(hiveObj.getDbname(), hiveObj.getObjectName()) : null;
@@ -2267,6 +2272,11 @@ public class RangerHiveAuthorizer extends RangerHiveAuthorizerBase {
         boolean ret;
         boolean recurse = !coarseCheck;
 
+        RangerPerfTracer perf = null;
+        if (RangerPerfTracer.isPerfTraceEnabled(PERF_HIVEAUTH_COARSEURI_LOG)) {
+            perf = RangerPerfTracer.getPerfTracer(PERF_HIVEAUTH_COARSEURI_LOG, "RangerHiveAuthorizer.isURIAccessAllowed(userName=" + userName + " filePath=" + filePath + " coarseCheck=" + coarseCheck + ")");
+        }
+
         if (action == FsAction.NONE) {
             ret = true;
         } else {
@@ -2277,7 +2287,7 @@ public class RangerHiveAuthorizer extends RangerHiveAuthorizerBase {
                     boolean isDenied = false;
 
                     for (FileStatus file : filestat) {
-                        if (FileUtils.isOwnerOfFileHierarchy(fs, file, userName) || FileUtils.isActionPermittedForFileHierarchy(fs, file, userName, action, recurse)) {
+                        if (FileUtils.isOwnerOfFileHierarchy(fs, file, userName, recurse) || FileUtils.isActionPermittedForFileHierarchy(fs, file, userName, action, recurse)) {
                             continue;
                         } else {
                             isDenied = true;
@@ -2300,6 +2310,7 @@ public class RangerHiveAuthorizer extends RangerHiveAuthorizerBase {
             }
         }
 
+        RangerPerfTracer.log(perf);
         return ret;
     }
 
@@ -2555,7 +2566,7 @@ public class RangerHiveAuthorizer extends RangerHiveAuthorizerBase {
             ret = hiveOpType == HiveOperationType.EXPORT;
 
             if (!ret) {
-                if (request.getHiveAccessType() == HiveAccessType.UPDATE && RangerHivePlugin.blockUpdateIfRowfilterColumnMaskSpecified) {
+                if ((request.getHiveAccessType() == HiveAccessType.UPDATE || request.getHiveAccessType() == HiveAccessType.ALTER) && RangerHivePlugin.blockUpdateIfRowfilterColumnMaskSpecified) {
                     ret = true;
                 }
             }

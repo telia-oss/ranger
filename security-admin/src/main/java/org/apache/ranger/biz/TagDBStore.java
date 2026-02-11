@@ -21,7 +21,7 @@ package org.apache.ranger.biz;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import org.apache.commons.collections.CollectionUtils;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.ranger.authorization.hadoop.config.RangerAdminConfig;
 import org.apache.ranger.authorization.utils.JsonUtils;
 import org.apache.ranger.common.MessageEnums;
@@ -1129,15 +1129,18 @@ public class TagDBStore extends AbstractTagStore {
                         LOG.debug("TagDBStore.createServiceTagsDelta(): failed to read tag id={}", tagId, t);
                     } finally {
                         if (tag == null) {
-                            tag = new RangerTag();
-
-                            tag.setId(tagId);
+                            if (!isSupportsTagsDedup()) {
+                                // Indicating policy engine to remove this TAG
+                                tag = new RangerTag();
+                                tag.setId(tagId);
+                            }
                         }
                     }
 
-                    RangerServiceTagsDeltaUtil.pruneUnusedAttributes(tag);
-
-                    ret.getTags().put(tag.getId(), tag);
+                    if (tag != null) {
+                        RangerServiceTagsDeltaUtil.pruneUnusedAttributes(tag);
+                        ret.getTags().put(tag.getId(), tag);
+                    }
                 }
 
                 XXTagDefDao tagDefDao = daoManager.getXXTagDef();

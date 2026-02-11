@@ -17,7 +17,7 @@
 
 package org.apache.ranger.service;
 
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.ranger.common.AppConstants;
 import org.apache.ranger.common.GUIDUtil;
 import org.apache.ranger.common.MessageEnums;
@@ -95,6 +95,20 @@ public abstract class RangerServiceServiceBase<T extends XXServiceBase, V extend
         }
 
         return retList;
+    }
+
+    @Override
+    public String getParentObjectName(V vObj, V oldObj) {
+        String serviceType = vObj != null ? vObj.getType() : null;
+        XXServiceDef xServiceDef = serviceType != null ? daoMgr.getXXServiceDef().findByName(serviceType) : null;
+        return xServiceDef != null ? xServiceDef.getName() : null;
+    }
+
+    @Override
+    public Long getParentObjectId(V vObj, V oldObj) {
+        String serviceType = vObj != null ? vObj.getType() : null;
+        XXServiceDef xServiceDef = serviceType != null ? daoMgr.getXXServiceDef().findByName(serviceType) : null;
+        return xServiceDef != null ? xServiceDef.getId() : null;
     }
 
     @Override

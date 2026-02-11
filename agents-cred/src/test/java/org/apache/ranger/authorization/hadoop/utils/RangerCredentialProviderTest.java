@@ -20,17 +20,24 @@ package org.apache.ranger.authorization.hadoop.utils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.alias.CredentialProvider;
 import org.apache.hadoop.security.alias.CredentialShell;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.MethodOrderer;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestMethodOrder;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.util.List;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 
+@ExtendWith(MockitoExtension.class)
+@TestMethodOrder(MethodOrderer.MethodName.class)
 public class RangerCredentialProviderTest {
     private final File     ksFile;
     private final String[] argsCreate;
@@ -56,7 +63,7 @@ public class RangerCredentialProviderTest {
         }
     }
 
-    @Before
+    @BeforeEach
     public void setup() throws Exception {
         // adding a delete before creating a keystore
         try {
@@ -91,13 +98,6 @@ public class RangerCredentialProviderTest {
         listThreads();
     }
 
-    @After
-    public void cleanup() throws Exception {
-        if (ksFile != null && ksFile.exists()) {
-            ksFile.delete();
-        }
-    }
-
     @Test
     public void testCredentialProvider() {
         //test credential provider is registered and return credential providers.
@@ -128,7 +128,14 @@ public class RangerCredentialProviderTest {
         listThreads();
     }
 
-    @After
+    @Test
+    public void testGetInstanceSingleton() {
+        RangerCredentialProvider first  = RangerCredentialProvider.getInstance();
+        RangerCredentialProvider second = RangerCredentialProvider.getInstance();
+        assertSame(first, second);
+    }
+
+    @AfterEach
     public void teardown() throws Exception {
         System.out.println("In teardown : Number of active Threads : " + Thread.activeCount());
 
@@ -140,6 +147,10 @@ public class RangerCredentialProviderTest {
         int ret = cs.run(argsDelete);
 
         assertEquals(0, ret);
+
+        if (ksFile != null && ksFile.exists()) {
+            ksFile.delete();
+        }
 
         listThreads();
     }

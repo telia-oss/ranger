@@ -23,8 +23,12 @@ import { Form, Field } from "react-final-form";
 import Select from "react-select";
 import CreatableSelect from "react-select/creatable";
 import { find, isEmpty } from "lodash";
-import { InfoIcon } from "../../utils/XAUtils";
-import { RegexMessage } from "../../utils/XAMessages";
+import { InfoIcon } from "Utils/XAUtils";
+import { RegexMessage } from "Utils/XAMessages";
+import {
+  selectInputCustomStyles,
+  trimInputValue
+} from "Components/CommonComponents";
 const esprima = require("esprima");
 
 export default function PolicyConditionsComp(props) {
@@ -89,7 +93,11 @@ export default function PolicyConditionsComp(props) {
   const ipRangeVal = (val) => {
     let value = [];
     if (!isEmpty(val)) {
-      value = val.map((m) => ({ label: m, value: m }));
+      // Trim existing values when displaying
+      value = val.map((m) => ({
+        label: m.trim(),
+        value: m.trim()
+      }));
     }
     return value;
   };
@@ -98,7 +106,7 @@ export default function PolicyConditionsComp(props) {
     let errors = "";
     if (values) {
       try {
-        let t = esprima.parseScript(values);
+        esprima.parseScript(values);
       } catch (e) {
         errors = e.message;
       }
@@ -192,6 +200,9 @@ export default function PolicyConditionsComp(props) {
                                           }
                                           as="textarea"
                                           rows={3}
+                                          onBlur={(e) =>
+                                            trimInputValue(e, input)
+                                          }
                                         />
                                         {meta.error && (
                                           <span className="invalid-field">
@@ -221,10 +232,29 @@ export default function PolicyConditionsComp(props) {
                                     {...input}
                                     isMulti
                                     isClearable
-                                    placeholder="enter expression"
+                                    placeholder=""
                                     width="500px"
                                     value={ipRangeVal(input.value)}
                                     onChange={(e) => handleChange(e, input)}
+                                    styles={selectInputCustomStyles}
+                                    formatCreateLabel={(inputValue) =>
+                                      `Create "${inputValue.trim()}"`
+                                    }
+                                    onCreateOption={(inputValue) => {
+                                      const trimmedValue = inputValue.trim();
+                                      if (trimmedValue) {
+                                        const newOption = {
+                                          label: trimmedValue,
+                                          value: trimmedValue
+                                        };
+                                        const currentValues = input.value || [];
+                                        const newValues = [
+                                          ...currentValues,
+                                          trimmedValue
+                                        ];
+                                        input.onChange(newValues);
+                                      }
+                                    }}
                                   />
                                 )}
                               />

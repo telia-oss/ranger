@@ -17,7 +17,7 @@
 
 package org.apache.ranger.db;
 
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.ranger.common.db.BaseDao;
 import org.apache.ranger.entity.XXSecurityZone;
 import org.apache.ranger.plugin.model.RangerSecurityZone;
@@ -172,5 +172,20 @@ public class XXSecurityZoneDao extends BaseDao<XXSecurityZone> {
         }
 
         return securityZoneList;
+    }
+
+    public String findZoneNameByZoneId(Long zoneId) {
+        if (zoneId == null) {
+            return null;
+        }
+
+        try {
+            return getEntityManager()
+                    .createNamedQuery("XXSecurityZone.findZoneNameByZoneId", String.class)
+                    .setParameter("zoneId", zoneId)
+                    .getSingleResult();
+        } catch (NoResultException e) {
+            return null;
+        }
     }
 }

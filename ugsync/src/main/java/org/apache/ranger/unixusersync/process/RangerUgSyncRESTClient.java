@@ -25,7 +25,7 @@ import com.sun.jersey.api.client.config.ClientConfig;
 import com.sun.jersey.api.client.config.DefaultClientConfig;
 import com.sun.jersey.api.client.filter.HTTPBasicAuthFilter;
 import com.sun.jersey.client.urlconnection.HTTPSProperties;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.security.SecureClientLogin;
 import org.apache.ranger.plugin.util.RangerRESTClient;
 import org.apache.ranger.unixusersync.config.UserGroupSyncConfig;
@@ -37,11 +37,11 @@ import javax.net.ssl.TrustManager;
 
 public class RangerUgSyncRESTClient extends RangerRESTClient {
     public RangerUgSyncRESTClient(String policyMgrBaseUrls, String ugKeyStoreFile, String ugKeyStoreFilepwd, String ugKeyStoreType, String ugTrustStoreFile, String ugTrustStoreFilepwd, String ugTrustStoreType, String authenticationType, String principal, String keytab, String polMgrUsername, String polMgrPassword) {
-        super(policyMgrBaseUrls, "", UserGroupSyncConfig.getInstance().getConfig());
+        super(policyMgrBaseUrls, "", UserGroupSyncConfig.getInstance().getConfig(), "ranger.usersync");
 
-        String authKerberos = "kerberos";
+        boolean isKerberized = "kerberos".equalsIgnoreCase(authenticationType) && SecureClientLogin.isKerberosCredentialExists(principal, keytab);
 
-        if (!(authKerberos.equalsIgnoreCase(authenticationType) && SecureClientLogin.isKerberosCredentialExists(principal, keytab))) {
+        if (!isKerberized) {
             setBasicAuthInfo(polMgrUsername, polMgrPassword);
         }
 

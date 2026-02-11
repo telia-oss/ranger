@@ -20,7 +20,7 @@
 package org.apache.ranger.plugin.util;
 
 import org.apache.commons.collections.Predicate;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.ranger.plugin.contextenricher.RangerServiceResourceMatcher;
 import org.apache.ranger.plugin.model.RangerPolicy;
 import org.apache.ranger.plugin.model.RangerServiceDef;
@@ -73,9 +73,7 @@ public class CachedResourceEvaluators {
         if (ret == null) {
             ret = RangerResourceEvaluatorsRetriever.getEvaluators(serviceResourceTrie, resource.getAsMap(), request.getResourceElementMatchingScopes(), predicate);
 
-            if (LOG.isDebugEnabled()) {
-                LOG.debug("Found [{}] service-resource-matchers for service-resource [{}]", ret.size(), resource.getAsString());
-            }
+            LOG.debug("Found [{}] service-resource-matchers for service-resource [{}]", (ret == null ? null : ret.size()), resource.getAsString());
 
             if (predicate != null) {
                 cache.cacheEvaluators(resource.getCacheKey(), request.getResourceElementMatchingScopes(), ret);

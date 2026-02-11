@@ -26,7 +26,7 @@ import org.apache.atlas.notification.NotificationConsumer;
 import org.apache.atlas.notification.NotificationInterface;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.ranger.authorization.utils.JsonUtils;
 import org.apache.ranger.plugin.util.ServiceTags;
@@ -230,6 +230,17 @@ public class AtlasTagSource extends AbstractTagSource {
                             LOG.error("Returning from thread. May cause process to be up but not processing events!!");
                             return;
                         }
+                    }
+                } else {
+                    try {
+                        long sleepInterval = TagSyncConfig.getTagSyncHAPassiveSleepInterval();
+                        LOG.debug("Sleeping for [{}] milliSeconds as this server is running in passive mode", sleepInterval);
+                        Thread.sleep(sleepInterval);
+                    } catch (InterruptedException interrupted) {
+                        LOG.error("Interrupted: ", interrupted);
+                        // preserve interrupt status for caller of the thread
+                        Thread.currentThread().interrupt();
+                        return;
                     }
                 }
             }

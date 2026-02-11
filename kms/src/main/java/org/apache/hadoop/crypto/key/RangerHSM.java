@@ -18,7 +18,7 @@
 package org.apache.hadoop.crypto.key;
 
 import com.sun.org.apache.xml.internal.security.utils.Base64;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.bouncycastle.crypto.RuntimeCryptoException;
 import org.slf4j.Logger;
@@ -150,7 +150,8 @@ public class RangerHSM implements RangerKMSMKI {
         return null;
     }
 
-    public boolean setMasterKey(String password, byte[] key) {
+    @Override
+    public boolean setExternalKeyAsMK(String password, byte[] key) {
         if (myStore != null) {
             try {
                 Key aesKey = new SecretKeySpec(key, MK_CIPHER);

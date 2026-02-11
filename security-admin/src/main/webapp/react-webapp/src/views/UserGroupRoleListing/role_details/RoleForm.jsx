@@ -20,21 +20,26 @@
 import React, { useEffect, useReducer } from "react";
 import { Button, Form as BForm, Col, Row, Table } from "react-bootstrap";
 import { Form, Field } from "react-final-form";
-import { scrollToError } from "Components/CommonComponents";
+import {
+  scrollToError,
+  BlockUi,
+  Loader,
+  CustomTooltip,
+  selectInputCustomStyles,
+  trimInputValue
+} from "Components/CommonComponents";
 import { FieldArray } from "react-final-form-arrays";
 import arrayMutators from "final-form-arrays";
 import AsyncSelect from "react-select/async";
 import { toast } from "react-toastify";
 import { findIndex, isEmpty, filter } from "lodash";
-import { commonBreadcrumb, serverError } from "../../../utils/XAUtils";
-import { Loader, CustomTooltip } from "Components/CommonComponents";
+import { commonBreadcrumb, serverError } from "Utils/XAUtils";
 import { useLocation, useParams, useNavigate } from "react-router-dom";
 import { fetchApi } from "Utils/fetchAPI";
 import usePrompt from "Hooks/usePrompt";
-import { RegexValidation } from "../../../utils/XAEnums";
-import { BlockUi } from "../../../components/CommonComponents";
+import { RegexValidation } from "Utils/XAEnums";
 
-const initialState = {
+const INITIAL_STATE = {
   loader: true,
   roleInfo: {},
   selectedUser: [],
@@ -44,7 +49,7 @@ const initialState = {
   blockUI: false
 };
 
-const PromtDialog = (props) => {
+const PromptDialog = (props) => {
   const { isDirtyField, isUnblock } = props;
   usePrompt("Are you sure you want to leave", isDirtyField && !isUnblock);
   return null;
@@ -95,9 +100,10 @@ function reducer(state, action) {
 
 function RoleForm() {
   const params = useParams();
-  const { state } = useLocation();
   const navigate = useNavigate();
-  const [roleFormState, dispatch] = useReducer(reducer, initialState);
+  const { state: navigateState } = useLocation();
+
+  const [state, dispatch] = useReducer(reducer, INITIAL_STATE);
   const {
     loader,
     roleInfo,
@@ -106,8 +112,10 @@ function RoleForm() {
     selectedGroup,
     preventUnBlock,
     blockUI
-  } = roleFormState;
+  } = state;
+
   const toastId = React.useRef(null);
+
   useEffect(() => {
     if (params?.roleID) {
       fetchRoleData(params.roleID);
@@ -129,6 +137,7 @@ function RoleForm() {
       return findIndex(selectedUser, data) === -1;
     }
   };
+
   const filterGroupOp = (data, formVal) => {
     if (formVal && formVal.groups) {
       let groupSelectedData = formVal.groups.map((m) => {
@@ -139,6 +148,7 @@ function RoleForm() {
       return findIndex(selectedGroup, data) === -1;
     }
   };
+
   const filterRoleOp = (data, formVal) => {
     if (formVal && formVal.roles) {
       let roleSelectedData = formVal.roles.map((m) => {
@@ -227,14 +237,20 @@ function RoleForm() {
           method: "post",
           data: formData
         });
-        let tblpageData = {};
-        if (state && state != null) {
-          tblpageData = state.tblpageData;
-          if (state.tblpageData.pageRecords % state.tblpageData.pageSize == 0) {
-            tblpageData["totalPage"] = state.tblpageData.totalPage + 1;
+        let tablePageData = {};
+        if (navigateState && navigateState != null) {
+          tablePageData = navigateState.tablePageData;
+          if (
+            navigateState.tablePageData.pageRecords %
+              navigateState.tablePageData.pageSize ==
+            0
+          ) {
+            tablePageData["totalPage"] =
+              navigateState.tablePageData.totalPage + 1;
           } else {
-            if (tblpageData !== undefined) {
-              tblpageData["totalPage"] = state.tblpageData.totalPage;
+            if (tablePageData !== undefined) {
+              tablePageData["totalPage"] =
+                navigateState.tablePageData.totalPage;
             }
           }
         }
@@ -246,7 +262,7 @@ function RoleForm() {
         navigate("/users/roletab", {
           state: {
             showLastPage: true,
-            addPageData: tblpageData
+            addPageData: tablePageData
           }
         });
       } catch (error) {
@@ -287,7 +303,7 @@ function RoleForm() {
   const handleUserAdd = (push) => {
     if (selectedUser.length == 0) {
       toast.dismiss(toastId.current);
-      toastId.current = toast.warning("Please select atleast one user!!");
+      toastId.current = toast.warning("Please select at least one user!!");
     } else {
       let usr = selectedUser.map(({ value }) => ({
         name: value,
@@ -307,7 +323,7 @@ function RoleForm() {
   const handleGroupAdd = (push) => {
     if (selectedGroup.length == 0) {
       toast.dismiss(toastId.current);
-      toastId.current = toast.warning("Please select atleast one group!!");
+      toastId.current = toast.warning("Please select at least one group!!");
     } else {
       let grp = selectedGroup.map(({ value }) => ({
         name: value,
@@ -347,7 +363,7 @@ function RoleForm() {
   const handleRoleAdd = (push) => {
     if (selectedRole.length == 0) {
       toast.dismiss(toastId.current);
-      toastId.current = toast.warning("Please select atleast one role!!");
+      toastId.current = toast.warning("Please select at least one role!!");
     } else {
       let rol = selectedRole.map(({ value }) => ({
         name: value,
@@ -400,7 +416,7 @@ function RoleForm() {
     if (params?.roleID) {
       if (Object.keys(roleInfo).length > 0) {
         formValueObj.name = roleInfo.name;
-        formValueObj.description = roleInfo.description;
+        formValueObj.description = roleInfo?.description?.trim();
         formValueObj.users = roleInfo.users;
         formValueObj.groups = roleInfo.groups;
         formValueObj.roles = roleInfo.roles;
@@ -408,6 +424,7 @@ function RoleForm() {
     }
     return formValueObj;
   };
+
   const validateForm = (values) => {
     const errors = {};
     if (!values.name) {
@@ -457,7 +474,7 @@ function RoleForm() {
             dirty
           }) => (
             <div className="wrap user-role-grp-form">
-              <PromtDialog isDirtyField={dirty} isUnblock={preventUnBlock} />
+              <PromptDialog isDirtyField={dirty} isUnblock={preventUnBlock} />
 
               <form
                 onSubmit={(event) => {
@@ -486,6 +503,7 @@ function RoleForm() {
                           }
                           disabled={params.roleID ? true : false}
                           data-cy="name"
+                          onBlur={(e) => trimInputValue(e, input)}
                         />
                         <span className="input-box-info-icon">
                           <CustomTooltip
@@ -527,6 +545,7 @@ function RoleForm() {
                           placeholder="Description"
                           className="form-control"
                           data-cy="description"
+                          onBlur={(e) => trimInputValue(e, input)}
                         />
                       </Col>
                     </Row>
@@ -617,6 +636,9 @@ function RoleForm() {
                             isMulti
                             data-name="usersSelect"
                             data-cy="usersSelect"
+                            styles={selectInputCustomStyles}
+                            tabSelectsValue={false}
+                            placeholder="Select Users"
                           />
                         </div>
                         <div className="col-sm-3">
@@ -723,6 +745,9 @@ function RoleForm() {
                             isMulti
                             data-name="groupsSelect"
                             data-cy="groupsSelect"
+                            styles={selectInputCustomStyles}
+                            tabSelectsValue={false}
+                            placeholder="Select Groups"
                           />
                         </div>
                         <div className="col-sm-3">
@@ -829,6 +854,9 @@ function RoleForm() {
                             isMulti
                             data-name="rolesSelect"
                             data-cy="rolesSelect"
+                            styles={selectInputCustomStyles}
+                            tabSelectsValue={false}
+                            placeholder="Select Roles"
                           />
                         </div>
                         <div className="col-sm-3">

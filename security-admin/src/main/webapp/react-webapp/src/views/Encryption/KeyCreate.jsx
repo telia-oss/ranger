@@ -17,7 +17,7 @@
  * under the License.
  */
 
-import React, { useReducer, useEffect, useState, useRef } from "react";
+import React, { useReducer, useEffect, useRef } from "react";
 import { Button, Table, Row, Col } from "react-bootstrap";
 import { Form, Field } from "react-final-form";
 import { toast } from "react-toastify";
@@ -27,22 +27,25 @@ import { fetchApi } from "Utils/fetchAPI";
 import {
   BlockUi,
   Loader,
-  scrollToError
-} from "../../components/CommonComponents";
-import { commonBreadcrumb, serverError } from "../../utils/XAUtils";
+  scrollToError,
+  trimInputValue
+} from "Components/CommonComponents";
+import { commonBreadcrumb, serverError } from "Utils/XAUtils";
 import { cloneDeep, find, isEmpty, values } from "lodash";
 import withRouter from "Hooks/withRouter";
 import { useLocation, useNavigate } from "react-router-dom";
 import usePrompt from "Hooks/usePrompt";
-import { getServiceDef } from "../../utils/appState";
+import { getServiceDef } from "Utils/appState";
 
-const initialState = {
+const INITIAL_STATE = {
   service: {},
   definition: {},
-  loader: true
+  loader: true,
+  preventUnBlock: false,
+  blockUI: false
 };
 
-const keyCreateReducer = (state, action) => {
+const reducer = (state, action) => {
   switch (action.type) {
     case "SET_LOADER":
       return {
@@ -56,26 +59,36 @@ const keyCreateReducer = (state, action) => {
         definition: action.definition,
         loader: action.loader
       };
+    case "SET_PREVENT_ALERT":
+      return {
+        ...state,
+        preventUnBlock: action.preventUnBlock
+      };
+    case "SET_BLOCK_UI":
+      return {
+        ...state,
+        blockUI: action.blockUI
+      };
     default:
       throw new Error();
   }
 };
 
-const PromtDialog = (props) => {
+const PromptDialog = (props) => {
   const { isDirtyField, isUnblock } = props;
   usePrompt("Are you sure you want to leave", isDirtyField && !isUnblock);
   return null;
 };
 
 function KeyCreate(props) {
-  const [keyDetails, dispatch] = useReducer(keyCreateReducer, initialState);
-  const { loader, service, definition } = keyDetails;
-  const { state } = useLocation();
   const navigate = useNavigate();
-  const [preventUnBlock, setPreventUnblock] = useState(false);
-  const [blockUI, setBlockUI] = useState(false);
+  const { state: navigateState } = useLocation();
+
   const toastId = useRef(null);
   const { allServiceDefs } = cloneDeep(getServiceDef());
+
+  const [state, dispatch] = useReducer(reducer, INITIAL_STATE);
+  const { loader, service, definition, preventUnBlock, blockUI } = state;
 
   useEffect(() => {
     fetchInitialData();
@@ -112,7 +125,7 @@ function KeyCreate(props) {
     serviceJson.name = values.name;
     serviceJson.cipher = values.cipher;
     serviceJson.length = values.length;
-    serviceJson.description = values.description;
+    serviceJson.description = values?.description?.trim();
     serviceJson.attributes = {};
 
     for (let key of Object.keys(values.attributes)) {
@@ -120,13 +133,21 @@ function KeyCreate(props) {
         !isEmpty(values?.attributes[key]?.name) &&
         !isEmpty(values?.attributes[key]?.value)
       ) {
-        serviceJson.attributes[values.attributes[key].name] =
-          values.attributes[key].value;
+        serviceJson.attributes[values.attributes[key].name.trim()] =
+          values.attributes[key].value.trim();
       }
     }
-    setPreventUnblock(true);
+
+    dispatch({
+      type: "SET_PREVENT_ALERT",
+      preventUnBlock: true
+    });
+
     try {
-      setBlockUI(true);
+      dispatch({
+        type: "SET_BLOCK_UI",
+        blockUI: true
+      });
       await fetchApi({
         url: "keys/key",
         method: "post",
@@ -135,19 +156,26 @@ function KeyCreate(props) {
         },
         data: serviceJson
       });
-      setBlockUI(false);
-      toast.success(`Success! Key created successfully`);
-      navigate(`/kms/keys/edit/manage/${state.detail}`, {
+      dispatch({
+        type: "SET_BLOCK_UI",
+        blockUI: false
+      });
+      toast.success(`Key created successfully`);
+      navigate(`/kms/keys/edit/manage/${navigateState.detail}`, {
         state: {
-          detail: state.detail
+          detail: navigateState.detail
         }
       });
     } catch (error) {
-      setBlockUI(false);
+      dispatch({
+        type: "SET_BLOCK_UI",
+        blockUI: false
+      });
       serverError(error);
-      console.error(`Error occurred while creating key! ${error}`);
+      console.error(`Error occurred while creating key : ${error}`);
     }
   };
+
   const fetchKmsServices = async () => {
     let serviceResp;
     dispatch({
@@ -159,7 +187,7 @@ function KeyCreate(props) {
         url: `plugins/services/name/${props.params.serviceName}`
       });
     } catch (error) {
-      console.error(`Error occurred while fetching Services! ${error}`);
+      console.error(`Error occurred while fetching services : ${error}`);
     }
 
     dispatch({
@@ -173,6 +201,7 @@ function KeyCreate(props) {
   const closeForm = () => {
     navigate(`/kms/keys/edit/manage/${props.params.serviceName}`);
   };
+
   const validate = (values) => {
     const errors = {};
     if (!values.name) {
@@ -183,6 +212,7 @@ function KeyCreate(props) {
     }
     return errors;
   };
+
   const keyCreateBreadcrumb = () => {
     let serviceDetails = {};
     serviceDetails["serviceDefId"] = definition && definition?.id;
@@ -193,6 +223,7 @@ function KeyCreate(props) {
       serviceDetails
     );
   };
+
   return loader ? (
     <Loader />
   ) : (
@@ -225,7 +256,7 @@ function KeyCreate(props) {
           }
         }) => (
           <div className="wrap">
-            <PromtDialog isDirtyField={dirty} isUnblock={preventUnBlock} />
+            <PromptDialog isDirtyField={dirty} isUnblock={preventUnBlock} />
             <form
               onSubmit={(event) => {
                 handleSubmit(event);
@@ -242,6 +273,7 @@ function KeyCreate(props) {
                         {...input}
                         name="name"
                         type="text"
+                        onBlur={(e) => trimInputValue(e, input)}
                         id={meta.error && meta.touched ? "isError" : "name"}
                         className={
                           meta.error && meta.touched
@@ -295,6 +327,7 @@ function KeyCreate(props) {
                   </Row>
                 )}
               </Field>
+
               <Field name="description">
                 {({ input }) => (
                   <Row className="form-group">
@@ -308,11 +341,13 @@ function KeyCreate(props) {
                         {...input}
                         className="form-control"
                         data-cy="description"
+                        onBlur={(e) => trimInputValue(e, input)}
                       />
                     </Col>
                   </Row>
                 )}
               </Field>
+
               <Row className="form-group">
                 <Col xs={3}>
                   <label className="form-label float-end">Attributes</label>
@@ -333,18 +368,26 @@ function KeyCreate(props) {
                           fields.map((name, index) => (
                             <tr key={name}>
                               <td className="text-center">
-                                <Field
-                                  name={`${name}.name`}
-                                  component="input"
-                                  className="form-control"
-                                />
+                                <Field name={`${name}.name`}>
+                                  {({ input }) => (
+                                    <input
+                                      {...input}
+                                      className="form-control"
+                                      onBlur={(e) => trimInputValue(e, input)}
+                                    />
+                                  )}
+                                </Field>
                               </td>
                               <td className="text-center">
-                                <Field
-                                  name={`${name}.value`}
-                                  component="input"
-                                  className="form-control"
-                                />
+                                <Field name={`${name}.value`}>
+                                  {({ input }) => (
+                                    <input
+                                      {...input}
+                                      className="form-control"
+                                      onBlur={(e) => trimInputValue(e, input)}
+                                    />
+                                  )}
+                                </Field>
                               </td>
                               <td className="text-center">
                                 <Button
@@ -410,7 +453,10 @@ function KeyCreate(props) {
                     size="sm"
                     onClick={() => {
                       form.reset;
-                      setPreventUnblock(true);
+                      dispatch({
+                        type: "SET_PREVENT_ALERT",
+                        preventUnBlock: true
+                      });
                       closeForm();
                     }}
                     disabled={submitting}

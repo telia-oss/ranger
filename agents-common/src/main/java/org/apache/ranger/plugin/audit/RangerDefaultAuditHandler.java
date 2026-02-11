@@ -20,7 +20,7 @@
 package org.apache.ranger.plugin.audit;
 
 import org.apache.commons.collections.CollectionUtils;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.ranger.audit.model.AuthzAuditEvent;
 import org.apache.ranger.audit.provider.AuditHandler;
@@ -128,7 +128,7 @@ public class RangerDefaultAuditHandler implements RangerAccessResultProcessor {
             ret.setClientIP(request.getClientIPAddress());
             ret.setClientType(request.getClientType());
             ret.setSessionId(request.getSessionId());
-            ret.setAclEnforcer(moduleName);
+            ret.setAclEnforcer(RangerAccessRequestUtil.getAclEnforcerOrDefault(request.getContext(), moduleName));
 
             Set<String> tags = getTags(request);
             if (tags != null) {
@@ -137,6 +137,7 @@ public class RangerDefaultAuditHandler implements RangerAccessResultProcessor {
 
             ret.setDatasets(getDatasets(request));
             ret.setProjects(getProjects(request));
+            ret.setDatasetIds(getDatasetIds(request));
             ret.setAdditionalInfo(getAdditionalInfo(request));
             ret.setClusterName(request.getClusterName());
             ret.setZoneName(result.getZoneName());
@@ -221,6 +222,12 @@ public class RangerDefaultAuditHandler implements RangerAccessResultProcessor {
         GdsAccessResult gdsResult = RangerAccessRequestUtil.getGdsResultFromContext(request.getContext());
 
         return gdsResult != null ? gdsResult.getProjects() : null;
+    }
+
+    public final Set<Long> getDatasetIds(RangerAccessRequest request) {
+        GdsAccessResult gdsResult = RangerAccessRequestUtil.getGdsResultFromContext(request.getContext());
+
+        return gdsResult != null ? gdsResult.getDatasetIds() : null;
     }
 
     public String getAdditionalInfo(RangerAccessRequest request) {

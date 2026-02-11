@@ -32,5 +32,13 @@ public interface RangerKMSMKI {
         return null;
     }
 
-    default void onInitialization() throws Exception                     {}
+    default void onInitialization() throws Exception {}
+
+    default boolean reencryptMKWithFipsAlgo(String mkPassword) throws Exception {
+        return  false;
+    }
+
+    default boolean setExternalKeyAsMK(String password, byte[] key) throws Throwable {
+        throw new UnsupportedOperationException("This method is not supported for current MK provider");
+    }
 }

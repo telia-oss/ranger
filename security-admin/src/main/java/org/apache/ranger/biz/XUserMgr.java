@@ -21,12 +21,11 @@ package org.apache.ranger.biz;
 
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.util.Time;
 import org.apache.ranger.biz.ServiceDBStore.REMOVE_REF_TYPE;
 import org.apache.ranger.common.AppConstants;
 import org.apache.ranger.common.ContextUtil;
-import org.apache.ranger.common.GUIDUtil;
 import org.apache.ranger.common.MessageEnums;
 import org.apache.ranger.common.PropertiesUtil;
 import org.apache.ranger.common.RangerCommonEnums;
@@ -175,9 +174,6 @@ public class XUserMgr extends XUserMgrBase {
 
     @Autowired
     ServiceDBStore svcStore;
-
-    @Autowired
-    GUIDUtil guidUtil;
 
     @Autowired
     XUgsyncAuditInfoService xUgsyncAuditInfoService;
@@ -996,6 +992,7 @@ public class XUserMgr extends XUserMgrBase {
 
         vXPortalUser.setPassword(actualPassword);
         vXPortalUser.setUserRoleList(vXUser.getUserRoleList());
+        vXPortalUser.setUserSource(vXUser.getUserSource());
 
         vXPortalUser = userMgr.createDefaultAccountUser(vXPortalUser);
 
@@ -1058,7 +1055,7 @@ public class XUserMgr extends XUserMgrBase {
 
         String firstName = vXUser.getFirstName();
 
-        if (firstName == null || "null".equalsIgnoreCase(firstName) || firstName.trim().isEmpty()) {
+        if (RangerCommonEnums.USER_EXTERNAL != vXUser.getUserSource() && (firstName == null || "null".equalsIgnoreCase(firstName) || firstName.trim().isEmpty())) {
             throw restErrorUtil.createRESTException("Please provide a valid first name.", MessageEnums.INVALID_INPUT_DATA);
         }
 
@@ -1119,7 +1116,7 @@ public class XUserMgr extends XUserMgrBase {
         }
 
         Collection<Long> groupIdList  = vXUser.getGroupIdList();
-        VXUser           existing     = xUserService.readResource(vXUser.getId());
+        VXUser           existing     = (vXUser.getId() != null) ? xUserService.readResource(vXUser.getId()) : null;
         XXPortalUser     xXPortalUser = userMgr.updateUserWithPass(vXPortalUser);
 
         //update permissions start

@@ -20,7 +20,7 @@
 package org.apache.ranger.plugin.policyevaluator;
 
 import org.apache.commons.collections.CollectionUtils;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.ranger.plugin.conditionevaluator.RangerAbstractConditionEvaluator;
 import org.apache.ranger.plugin.conditionevaluator.RangerConditionEvaluator;
 import org.apache.ranger.plugin.model.RangerPolicy;
@@ -259,10 +259,10 @@ public class RangerDefaultPolicyEvaluator extends RangerAbstractPolicyEvaluator 
                     final ResourceMatchingScope resourceMatchingScope = request.getResourceMatchingScope() != null ? request.getResourceMatchingScope() : ResourceMatchingScope.SELF;
                     final boolean               isMatched;
 
-                    if (request.isAccessTypeAny() || resourceMatchingScope == ResourceMatchingScope.SELF_OR_DESCENDANTS) {
-                        isMatched = matchType == MatchType.SELF || matchType == MatchType.SELF_AND_ALL_DESCENDANTS || matchType == MatchType.DESCENDANT;
+                    if (request.isAccessTypeAny() || resourceMatchingScope == RangerAccessRequest.ResourceMatchingScope.SELF_OR_DESCENDANTS) {
+                        isMatched = matchType == RangerPolicyResourceMatcher.MatchType.SELF || matchType == RangerPolicyResourceMatcher.MatchType.SELF_AND_ALL_DESCENDANTS || matchType == RangerPolicyResourceMatcher.MatchType.DESCENDANT || (matchType == RangerPolicyResourceMatcher.MatchType.ANCESTOR && request instanceof RangerTagAccessRequest);
                     } else {
-                        isMatched = matchType == MatchType.SELF || matchType == MatchType.SELF_AND_ALL_DESCENDANTS;
+                        isMatched = matchType == RangerPolicyResourceMatcher.MatchType.SELF || matchType == RangerPolicyResourceMatcher.MatchType.SELF_AND_ALL_DESCENDANTS || (matchType == RangerPolicyResourceMatcher.MatchType.ANCESTOR && request instanceof RangerTagAccessRequest);
                     }
 
                     if (isMatched) {
@@ -611,8 +611,12 @@ public class RangerDefaultPolicyEvaluator extends RangerAbstractPolicyEvaluator 
                             if (getPolicyPriority() >= oldPriority && allowResult != null && (oneRequest.isAccessTypeAny() || RangerAccessRequestUtil.getIsAnyAccessInContext(oneRequest.getContext()))) {
                                 accessTypeResults.put(accessType, allowResult);
                             } else {
-                                if (getPolicyPriority() > oldPriority && denyResult != null) {
-                                    accessTypeResults.put(accessType, denyResult);
+                                if (getPolicyPriority() > oldPriority) {
+                                    if (allowResult != null) {
+                                        accessTypeResults.put(accessType, allowResult);
+                                    } else if (denyResult != null) {
+                                        accessTypeResults.put(accessType, denyResult);
+                                    }
                                 }
                             }
                         }

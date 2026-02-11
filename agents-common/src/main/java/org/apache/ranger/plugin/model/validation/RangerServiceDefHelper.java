@@ -20,10 +20,14 @@
 package org.apache.ranger.plugin.model.validation;
 
 import org.apache.commons.collections.CollectionUtils;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.thirdparty.com.google.common.collect.Lists;
 import org.apache.hadoop.thirdparty.com.google.common.collect.Sets;
+import org.apache.ranger.authz.api.RangerAuthzApiErrorCode;
+import org.apache.ranger.authz.api.RangerAuthzException;
+import org.apache.ranger.authz.util.RangerResourceNameParser;
 import org.apache.ranger.plugin.model.RangerPolicy;
+import org.apache.ranger.plugin.model.RangerPolicy.RangerPolicyResource;
 import org.apache.ranger.plugin.model.RangerServiceDef;
 import org.apache.ranger.plugin.model.RangerServiceDef.RangerAccessTypeDef;
 import org.apache.ranger.plugin.model.RangerServiceDef.RangerResourceDef;
@@ -44,6 +48,9 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
+
+import static org.apache.ranger.authz.util.RangerResourceNameParser.RRN_RESOURCE_TYPE_SEP;
+import static org.apache.ranger.plugin.model.RangerServiceDef.OPTION_RRN_RESOURCE_SEP_CHAR;
 
 public class RangerServiceDefHelper {
     private static final Logger LOG = LoggerFactory.getLogger(RangerServiceDefHelper.class);
@@ -216,6 +223,18 @@ public class RangerServiceDefHelper {
         return delegate.getResourceHierarchyKeys(policyType);
     }
 
+    public char getRrnResourceSep() {
+        return delegate.getRrnResourceSepChar();
+    }
+
+    public String getRrnTemplate(String resourceName) {
+        return delegate.getRrnTemplate(resourceName);
+    }
+
+    public RangerResourceNameParser getRrnParser(String resourceName) {
+        return delegate.getRrnParser(resourceName);
+    }
+
     public boolean isDataMaskSupported() {
         return delegate.isDataMaskSupported();
     }
@@ -359,6 +378,10 @@ public class RangerServiceDefHelper {
         return delegate.isResourceGraphValid();
     }
 
+    public Set<String> getAllResourceNames() {
+        return delegate.rrnTemplates.keySet();
+    }
+
     public List<String> getOrderedResourceNames(Collection<String> resourceNames) {
         final List<String> ret;
 
@@ -419,6 +442,24 @@ public class RangerServiceDefHelper {
         return ret;
     }
 
+    public Map<String, String> parseResourceToMap(String resource) throws RangerAuthzException {
+        int                      sepPos       = resource.indexOf(RRN_RESOURCE_TYPE_SEP);
+        String                   resourceType = sepPos < 1 ? "" : resource.substring(0, sepPos);
+        RangerResourceNameParser parser       = this.getRrnParser(resourceType);
+
+        if (parser == null) {
+            throw new RangerAuthzException(RangerAuthzApiErrorCode.INVALID_RESOURCE_TYPE_NOT_VALID, resource, resourceType);
+        }
+
+        return parser.parseToMap(resource.substring(sepPos + 1));
+    }
+
+    public Map<String, RangerPolicyResource> parseResourceToPolicyResources(String resource) throws RangerAuthzException {
+        Map<String, String> resourceMap = parseResourceToMap(resource);
+
+        return resourceMap.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey, e -> new RangerPolicyResource(e.getValue())));
+    }
+
     /**
      * Not designed for public access.  Package level only for testability.
      */
@@ -438,6 +479,9 @@ public class RangerServiceDefHelper {
         final Set<String>                                  allAccessTypes;
         final boolean                                      isDataMaskSupported;
         final boolean                                      isRowFilterSupported;
+        final char                                         rrnResourceSepChar;
+        final Map<String, String>                          rrnTemplates = new HashMap<>();
+        final Map<String, RangerResourceNameParser>        rrnParsers = new HashMap<>();
 
         public Delegate(RangerServiceDef serviceDef, boolean checkForCycles) {
             // NOTE: we assume serviceDef, its name and update time are can never by null.
@@ -474,13 +518,27 @@ public class RangerServiceDefHelper {
                 }
             }
 
-            impliedGrants  = computeImpliedGrants();
-            allAccessTypes = Collections.unmodifiableSet(serviceDef.getAccessTypes().stream().map(RangerAccessTypeDef::getName).collect(Collectors.toSet()));
-            isDataMaskSupported = CollectionUtils.isNotEmpty(hierarchyKeys.get(RangerPolicy.POLICY_TYPE_DATAMASK));
+            String optRrnResourceSep = serviceDef.getOptions() != null ? serviceDef.getOptions().get(OPTION_RRN_RESOURCE_SEP_CHAR) : null;
+
+            impliedGrants        = computeImpliedGrants();
+            allAccessTypes       = Collections.unmodifiableSet(serviceDef.getAccessTypes().stream().map(RangerAccessTypeDef::getName).collect(Collectors.toSet()));
+            isDataMaskSupported  = CollectionUtils.isNotEmpty(hierarchyKeys.get(RangerPolicy.POLICY_TYPE_DATAMASK));
             isRowFilterSupported = CollectionUtils.isNotEmpty(hierarchyKeys.get(RangerPolicy.POLICY_TYPE_ROWFILTER));
+            rrnResourceSepChar   = StringUtils.isEmpty(optRrnResourceSep) ? RangerServiceDef.DEFAULT_RRN_RESOURCE_SEP_CHAR : optRrnResourceSep.charAt(0);
 
             if (isValid) {
                 orderedResourceNames = buildSortedResourceNames();
+
+                for (RangerResourceDef resourceDef : serviceDef.getResources()) {
+                    try {
+                        RangerResourceNameParser rrnParser = createRrnParser(resourceDef);
+
+                        this.rrnParsers.put(resourceDef.getName(), rrnParser);
+                        this.rrnTemplates.put(resourceDef.getName(), rrnParser.getTemplate());
+                    } catch (RangerAuthzException excp) {
+                        LOG.error("failed to create RRN parser for resource [{}]", resourceDef.getName(), excp);
+                    }
+                }
             } else {
                 orderedResourceNames = new ArrayList<>();
             }
@@ -549,6 +607,18 @@ public class RangerServiceDefHelper {
             Set<Set<String>> ret = hierarchyKeys.get(policyType);
 
             return ret != null ? ret : Collections.emptySet();
+        }
+
+        public char getRrnResourceSepChar() {
+            return rrnResourceSepChar;
+        }
+
+        public String getRrnTemplate(String resourceName) {
+            return rrnTemplates.get(resourceName);
+        }
+
+        public RangerResourceNameParser getRrnParser(String resourceName) {
+            return rrnParsers.get(resourceName);
         }
 
         public boolean isDataMaskSupported() {
@@ -870,6 +940,22 @@ public class RangerServiceDefHelper {
             public int compareTo(ResourceNameLevel other) {
                 return Integer.compare(this.level, other.level);
             }
+        }
+
+        // create default resource-name template for the resource-def, like:
+        //  database:database
+        //  table:database/table
+        //  column:database/table/column
+        //  path:bucket/path
+        //  key:volume/bucket/key
+        private RangerResourceNameParser createRrnParser(RangerResourceDef resourceDef) throws RangerAuthzException {
+            List<String> path = new ArrayList<>();
+
+            for (RangerResourceDef resource = resourceDef; resource != null; resource = getResourceDef(resource.getParent(), RangerPolicy.POLICY_TYPE_ACCESS)) {
+                path.add(0, resource.getName());
+            }
+
+            return new RangerResourceNameParser(path.toArray(RangerResourceNameParser.EMPTY_ARRAY), rrnResourceSepChar);
         }
     }
 
